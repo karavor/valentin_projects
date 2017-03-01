@@ -463,7 +463,7 @@ int anti_hairpin  (string* undefined_rna,
     for (int l = 0; l < *number_of_links; l++)
     {
         getline(output_r, temp_str);
-        links_reader(HNL, &temp_str);
+        links_reader(&HNL[l], &temp_str);
     }
     return 0;
 }
@@ -499,8 +499,8 @@ int main_work  (string*   input_rna,
     float antihairpin_index = 0,
           lost_affinity_index = 0;
 
-    (*output_w) << "final_olig"   << '/t'
-                << "affinity, %"  << '/t'
+    (*output_w) << "final_olig"   << '\t'
+                << "affinity, %"  << '\t'
                 << "dG, kcal/mol" << endl;
     if ( end_program_check (initial_dG,
                             *target_hairpin_dG,
