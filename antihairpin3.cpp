@@ -123,12 +123,6 @@ void string_inverser (string* s)
     }
 }
 
-
-struct rna
-{
-    string seq, seq_struct;
-};
-
 struct hairpin_nucleotide_links
 {
     float first_nucleotide_number_in_link;
@@ -280,14 +274,14 @@ int end_program_check (float     dG,
                                                           ||
          dG > target_hairpin_dG                             )
     {
-        (*output_w) << (*defined_rna) << '/t'
-                    << aff << '/t'
-                    << dG  << '/t';
+        (*output_w) << (*defined_rna) << '\t'
+                    << aff << '\t'
+                    << dG  << '\t';
         if ( abs( aff - target_aff ) < target_aff_accuracy
                                                           ||
              aff > target_aff                               )
-             (*output_w) << '+' << endl;
-        else (*output_w) << '-' << endl;
+             (*output_w) << ' ' << '+' << endl;
+        else (*output_w) << ' ' << '-' << endl;
         return 1;
     }
     return 0;
@@ -324,15 +318,15 @@ int anti_hairpin  (string* undefined_rna,
                                        undefined_rna, // JUST after return we won't need it
                                        HNL,
                                        number_of_links    );
-            (*output_w) << (*defined_rna) << '/t'
-                        << aff_ << '/t'
-                        << dG_  << '/t';
+            (*output_w) << (*defined_rna) << '\t'
+                        << aff_ << '\t'
+                        << dG_  << '\t';
         if ( (abs( aff_ - target_aff ) < target_dG_accuracy     ||   // HERE CORRECTIONS NEED
              aff_ > target_aff)                                 &&
              (abs(dG_ - target_hairpin_dG) < target_dG_accuracy ||
              dG_ > target_hairpin_dG)                              )
-             (*output_w) << '+' << endl;
-        else (*output_w) << '-' << endl;
+             (*output_w) << ' ' << '+' << endl;
+        else (*output_w) << ' ' << '-' << endl;
 
         return 1;
         }
