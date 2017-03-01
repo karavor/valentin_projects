@@ -22,6 +22,7 @@ const char* mfe_variants[4] = {"./input/var_1",
                                "./input/var_4"};
 
 const int   max_loop_size = 10;
+//const int   min_level_of_aff_relative_changing = 0.03; //should be < 1 and influence the way how diff variants are compared
 //const float diff_in_energy_limit = 0.001;
 
 int   rna_length = 0;
@@ -140,7 +141,7 @@ struct hairpin_nucleotide_links
     #/bin/bash \n\
     export NUPACKHOME=/home/valentin/work_backup/nupack \n\
     export CODDING_HOME=/home/valentin/work_backup/codding \n\
-    $NUPACKHOME/bin/design $CODDING_HOME/input/input_seq \n\
+    $NUPACKHOME/bin/design -loadseed $CODDING_HOME/input/input_seq \n\
 "
 
 #define CONCENTRATIONS_FUNC "\
@@ -149,6 +150,12 @@ struct hairpin_nucleotide_links
     export CODDING_HOME=/home/valentin/work_backup/codding \n\
     $NUPACKHOME/bin/complexes -T 23 -material rna $CODDING_HOME/input/complex \n\
     $NUPACKHOME/bin/concentrations $CODDING_HOME/input/complex \n\
+"
+
+#define COPY_F "\
+    #/bin/bash \n\
+    cp ./input/input_seq.fold ./output/input_seq.fold \n\
+    cp ./input/input_seq.summary ./output/input_seq.summary \n\
 "
 
 void links_reader(hairpin_nucleotide_links* HNL,
@@ -280,8 +287,8 @@ int end_program_check (float     dG,
         if ( abs( aff - target_aff ) < target_aff_accuracy
                                                           ||
              aff > target_aff                               )
-             (*output_w) << ' ' << '+' << endl;
-        else (*output_w) << ' ' << '-' << endl;
+             (*output_w) << '\t' << '+' << endl;
+        else (*output_w) << '\t' << '-' << endl;
         return 1;
     }
     return 0;
@@ -303,10 +310,13 @@ int anti_hairpin  (string* undefined_rna,
                    float   target_aff,
                    float   target_aff_accuracy,
                    ofstream* output_w,
-                   ofstream* stat_w)
+                   ofstream* stat_w,
+                   float break_flag)
+                   //ofstream* bigstat_w,
+                   //int loop_counter)
 {
     int max_dist_HNL_element_number = 0;
-    int lack_of_link_groups = *number_of_links;
+    int lack_of_link_groups = *number_of_links; //*bigstat_w << "number_of_links" << '\t' << *number_of_links << endl;
     int i = 0;
     float aff_, dG_;
     while (i - max_dist_HNL_element_number == 0) //number of sequence links (one after another)
@@ -325,8 +335,8 @@ int anti_hairpin  (string* undefined_rna,
              aff_ > target_aff)                                 &&
              (abs(dG_ - target_hairpin_dG) < target_dG_accuracy ||
              dG_ > target_hairpin_dG)                              )
-             (*output_w) << ' ' << '+' << endl;
-        else (*output_w) << ' ' << '-' << endl;
+             (*output_w) << '\t' << '+' << endl;
+        else (*output_w) << '\t' << '-' << endl;
 
         return 1;
         }
@@ -343,7 +353,7 @@ int anti_hairpin  (string* undefined_rna,
              i++) // i shows the last HNL elem numb in current group of max distant links
          {}
          lack_of_link_groups--;
-    }
+    } //*bigstat_w << "i" << '\t' << i << endl;
     string new_undefined_rna,
            new_defined_rna,
            new_rna_struct;
@@ -359,7 +369,7 @@ int anti_hairpin  (string* undefined_rna,
 
     ofstream input_w;
     ifstream output_r;
-
+    //*bigstat_w << "variants" << '\t';
     for (int j = 0; j < 4; j++)
     {
         new_undefined_rna = *undefined_rna;
@@ -385,7 +395,7 @@ int anti_hairpin  (string* undefined_rna,
         new_undefined_rna[ HNL[i - (j%2)].second_nucleotide_number_in_link - 1] = 'N';
 
         input_w.open(input_design);
-        input_w << *target_struct << endl;
+        input_w << *target_struct << endl; //*bigstat_w << new_undefined_rna << '\t';
         input_w << new_undefined_rna;
         input_w.close();
 
@@ -393,25 +403,27 @@ int anti_hairpin  (string* undefined_rna,
 
         output_r.open(output_design);
         do    {getline(output_r, new_defined_rna);}
-        while (new_defined_rna[0] != 'U' &&
-               new_defined_rna[0] != 'C' &&
-               new_defined_rna[0] != 'A' &&
-               new_defined_rna[0] != 'G'   );
-        output_r.close();
+        while (new_defined_rna[0] == '%');
+        output_r.close(); //*bigstat_w << new_defined_rna << '\t';
+
+        //if (loop_counter == 1 && j == 3)
+            //system (COPY_F);
 
         new_dG = dG_and_struct_reader(&new_defined_rna,
                                       &new_rna_struct,
                                        new_HNL,
-                                      &new_number_of_links);
+                                      &new_number_of_links);//*bigstat_w << new_dG << '\t';
 
         new_aff = aff_reader(input_rna, &new_defined_rna);
 
-        antihairpin_index[j]   = (new_dG - initial_dG) / abs(initial_dG); // higher is better
-        lost_affinity_index[j] = (initial_aff - new_aff) / initial_aff;   // lower is better
-        mutation_comparison_table[j] =                     // how many percents of hairpin destruction
-        abs (antihairpin_index[j]/lost_affinity_index[j]); // we have on one percent of affinity loss
-
-        input_w.open(mfe_variants[j]);
+        antihairpin_index[j]   = (new_dG - initial_dG) / abs(initial_dG); //*bigstat_w << antihairpin_index[j] << '\t';// higher is better
+        lost_affinity_index[j] = (initial_aff - new_aff) / initial_aff;   //*bigstat_w << lost_affinity_index[j] << '\t';// lower is better
+        if (lost_affinity_index[j] < abs(antihairpin_index[j]/10))
+            mutation_comparison_table[j] = abs (antihairpin_index[j]);
+        else
+            mutation_comparison_table[j] =                     // how many percents of hairpin destruction
+            abs (antihairpin_index[j]/lost_affinity_index[j]); // we have on one percent of affinity loss
+        input_w.open(mfe_variants[j]); //*bigstat_w << mutation_comparison_table[j] << endl << '\t';
         input_w << new_undefined_rna << endl <<
              new_defined_rna   << endl <<
              new_rna_struct << endl <<
@@ -424,7 +436,7 @@ int anti_hairpin  (string* undefined_rna,
         input_w.close();
     }
     delete [] new_HNL;
-    i = max_arr_elem_numb( mutation_comparison_table, 4 );
+    i = max_arr_elem_numb( mutation_comparison_table, 4 ); //*bigstat_w << endl << "i" << '\t' <<  i << endl;
 
     *antihairpin_index_   = antihairpin_index[i];
     *lost_affinity_index_ = lost_affinity_index[i];
@@ -457,6 +469,14 @@ int anti_hairpin  (string* undefined_rna,
                           defined_rna,
                           output_w))
         return 1;
+    if (break_flag)
+    {
+        (*output_w) << (*defined_rna) << '\t'
+                    << new_aff << '\t'
+                    << new_dG  << '\t'
+                    << '\t' << '-' << endl;
+        return 1;
+    }
     getline(output_r, temp_str);
     decimal_numb_reader(&temp_str, 0, &new_dG);
     *number_of_links = (int)new_dG;
@@ -499,9 +519,6 @@ int main_work  (string*   input_rna,
     float antihairpin_index = 0,
           lost_affinity_index = 0;
 
-    (*output_w) << "final_olig"   << '\t'
-                << "affinity, %"  << '\t'
-                << "dG, kcal/mol" << endl;
     if ( end_program_check (initial_dG,
                             *target_hairpin_dG,
                             *target_dG_accuracy,
@@ -513,6 +530,11 @@ int main_work  (string*   input_rna,
         return 0;
     ofstream stat_w;
     stat_w.open(statistic);
+    stat_w << (*input_rna) << '\t'
+           << (*target_hairpin_dG) << '\t'
+           << (*target_dG_accuracy) << '\t'
+           << (*target_aff) << '\t'
+           << (*target_aff_accuracy) << endl;
     stat_w << "structure"      << '\t'
       << "hairpin_dG"          << '\t'
       << "affinity"            << '\t'
@@ -526,6 +548,9 @@ int main_work  (string*   input_rna,
       << lost_affinity_index << endl;
     stat_w << defined_rna_struct  << endl;
 
+    int break_flag = 0;
+    //ofstream bigstat_w;
+    //bigstat_w.open("./output/bigstat");
     for ( int i = 0; i < max_loop_size; i++ )
     {
         if (anti_hairpin(&undefined_rna,
@@ -543,8 +568,13 @@ int main_work  (string*   input_rna,
                          *target_aff,
                          *target_aff_accuracy,
                          output_w,
-                         &stat_w)             )
-            break;
+                         &stat_w,
+                         break_flag)       )
+                         //&bigstat_w,
+                         //i)             )
+             break;
+        if (i == max_loop_size - 2)
+            break_flag = 1;
     }
     stat_w.close();
     delete [] HNL;
@@ -612,6 +642,9 @@ int main()
     r.open(input_file);
     ofstream w;
     w.open(output_file);
+    w    << "final_olig"   << '\t'
+         << "affinity, %"  << '\t'
+         << "dG, kcal/mol" << endl;
 
     while ( getline(r, input_str) )
     {
@@ -630,6 +663,7 @@ int main()
                   &target_aff_accuracy,
                   &w);
         input_rna.clear();
+        initial_rna.clear();
     }
     r.close();
     w.close();
