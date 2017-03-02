@@ -269,9 +269,9 @@ float aff_reader (string* seq_1, string* seq_2)
     return (aff/1e-06)*100;
 }
 
-design_maker (string* target_struct, //read
-              string* undefined_rna, //read
-              string* defined_rna   )//write
+void design_maker (string* target_struct, //read
+                   string* undefined_rna, //read
+                   string* defined_rna   )//write
 {
     ofstream input_w;
     input_w.open(input_design);
@@ -287,6 +287,88 @@ design_maker (string* target_struct, //read
     while ( (*defined_rna)[0] == '%' );
     output_r.close();
 }
+
+int aff_reducer_1(string* input_rna,      //it's like simple total antihairpin (additional)
+                  string* new_defined_rna,
+                  string* undefined_rna,
+                  string* target_struct,
+                  int*    number_of_links,
+                  float*  new_aff,
+                  float   aff,
+                  hairpin_nucleotide_links*  HNL)
+{
+    for (int i = 0; i < *number_of_links; i++)
+    {
+        if ( (*undefined_rna)[HNL[i].first_nucleotide_number_in_link - 1] == 'N' )
+            (*undefined_rna)[HNL[i].second_nucleotide_number_in_link - 1] = 'N';
+        else (*undefined_rna)[HNL[i].first_nucleotide_number_in_link - 1] = 'N';
+        design_maker(target_struct,
+                     undefined_rna,
+                     new_defined_rna);
+        *new_aff = aff_reader (input_rna, new_defined_rna);
+        if ( aff - *new_aff > absolute_aff_changing ) // aff started change significantly
+            return 1;
+    }
+    string temp_str;
+    if (dG_and_struct_reader (new_defined_rna,
+                              &temp_str,
+                              HNL,
+                              number_of_links)  < 0)
+    {
+        if (aff_reducer_1(input_rna,
+                          new_defined_rna,
+                          undefined_rna,
+                          target_struct,
+                          number_of_links,
+                          new_aff,
+                          aff,
+                          HNL)              )
+        return 1;
+    }
+    return 0; // aff didn't start change significantly
+}
+
+int aff_reducer_2(string* input_rna,
+                  string* new_defined_rna,
+                  string* undefined_rna,
+                  string* target_struct,
+                  int*    number_of_links,
+                  float*  new_aff,
+                  float   aff,
+                  hairpin_nucleotide_links*  HNL)
+{
+
+    for (int i = 0; i < *number_of_links; i++)
+    {
+        if ( (*undefined_rna)[HNL[i].first_nucleotide_number_in_link - 1] == 'N' )
+            (*undefined_rna)[HNL[i].second_nucleotide_number_in_link - 1] = 'N';
+        else (*undefined_rna)[HNL[i].first_nucleotide_number_in_link - 1] = 'N';
+        design_maker(target_struct,
+                     undefined_rna,
+                     new_defined_rna);
+        *new_aff = aff_reader (input_rna, new_defined_rna);
+        if ( aff - *new_aff > absolute_aff_changing ) // aff started change significantly
+            return 1;
+    }
+    string temp_str;
+    if (dG_and_struct_reader (new_defined_rna,
+                              &temp_str,
+                              HNL,
+                              number_of_links)  < 0)
+    {
+        if (aff_reducer_1(input_rna,
+                          new_defined_rna,
+                          undefined_rna,
+                          target_struct,
+                          number_of_links,
+                          new_aff,
+                          aff,
+                          HNL)              )
+        return 1;
+    }
+    return 0; // aff didn't start change significantly
+}
+
 
 int aff_reducer(float   aff,
                 float   target_aff,
@@ -305,19 +387,36 @@ int aff_reducer(float   aff,
         target_struct.push_back('.');
 
     float new_aff;
-    for (int i = 0; i < number_of_links; i++)
+    string complex_struct,
+           defined_rna_in_compl_struct;
+    ifstream inp_r;
+    ofstream inp_w;
+    if (!aff_reducer_1(input_rna,          // aff didn't start change significantly
+                       &new_defined_rna,
+                       &undefined_rna,
+                       &target_struct,
+                       &number_of_links,
+                       &new_aff,
+                       aff,
+                       HNL)               )
     {
-        undefined_rna[HNL[i].first_nucleotide_number_in_link - 1] = 'N';
-        design_maker(&target_struct,
-                     &undefined_rna,
-                     &new_defined_rna);
-        new_aff = aff_reader (input_rna, &new_defined_rna);
-        if (new_aff > aff                        ||
-            aff - new_aff > absolute_aff_changing  )
-        {
+        inp_w.open(input_mfe);
+        inp_w << (*input_rna) << "+" << new_defined_rna;
+        inp_w.close(input_mfe);
 
-        }
-    }
+        system(DESIGN_FUNC);
+
+        inp_r.open(output_mfe);
+        do getline(inp_r, complex_struct);
+        while (complex_struct[0] != '.' &&
+               complex_struct[0] != '('   )
+        inp_r.close();
+
+        for (int i = 0; i < *number_of_links; i++)
+        defined_rna_in_compl_struct
+
+    } else
+
     //string rna_complex = (*input_rna) + "+" + (*defined_rna);
 }
 
