@@ -329,46 +329,43 @@ int aff_reducer_1(string* input_rna,      //it's like simple total antihairpin (
 }
 
 int aff_reducer_2(string* input_rna,
+                  string* complex_struct,
                   string* new_defined_rna,
                   string* undefined_rna,
                   string* target_struct,
-                  int*    number_of_links,
                   float*  new_aff,
-                  float   aff,
-                  hairpin_nucleotide_links*  HNL)
+                  float   aff)
 {
 
-    for (int i = 0; i < *number_of_links; i++)
+    for (int i = 0; i < (*complex_struct).length(); i++)
     {
-        if ( (*undefined_rna)[HNL[i].first_nucleotide_number_in_link - 1] == 'N' )
-            (*undefined_rna)[HNL[i].second_nucleotide_number_in_link - 1] = 'N';
-        else (*undefined_rna)[HNL[i].first_nucleotide_number_in_link - 1] = 'N';
-        design_maker(target_struct,
-                     undefined_rna,
-                     new_defined_rna);
-        *new_aff = aff_reader (input_rna, new_defined_rna);
-        if ( aff - *new_aff > absolute_aff_changing ) // aff started change significantly
-            return 1;
-    }
-    string temp_str;
-    if (dG_and_struct_reader (new_defined_rna,
-                              &temp_str,
-                              HNL,
-                              number_of_links)  < 0)
-    {
-        if (aff_reducer_1(input_rna,
-                          new_defined_rna,
-                          undefined_rna,
-                          target_struct,
-                          number_of_links,
-                          new_aff,
-                          aff,
-                          HNL)              )
-        return 1;
+        if ( (*complex_struct)[i] == '(' )
+        {
+            switch((*undefined_rna)[i])
+            {
+                case 'C':
+                    (*undefined_rna)[i] = 'D';
+                    break;
+                case 'G':
+                    (*undefined_rna)[i] = 'H';
+                    break;
+                case 'A':
+                    (*undefined_rna)[i] = 'B';
+                    break;
+                case 'U':
+                    (*undefined_rna)[i] = 'V';
+                    break;
+            }
+            design_maker(target_struct,
+                         undefined_rna,
+                         new_defined_rna);
+            *new_aff = aff_reader (input_rna, new_defined_rna);
+            if ( aff - *new_aff > absolute_aff_changing ) // aff started change significantly
+                return 1;
+        }
     }
     return 0; // aff didn't start change significantly
 }
-
 
 int aff_reducer(float   aff,
                 float   target_aff,
@@ -387,8 +384,7 @@ int aff_reducer(float   aff,
         target_struct.push_back('.');
 
     float new_aff;
-    string complex_struct,
-           defined_rna_in_compl_struct;
+    string complex_struct;
     ifstream inp_r;
     ofstream inp_w;
     if (!aff_reducer_1(input_rna,          // aff didn't start change significantly
@@ -400,6 +396,7 @@ int aff_reducer(float   aff,
                        aff,
                        HNL)               )
     {
+        undefined_rna = new_defined_rna;
         inp_w.open(input_mfe);
         inp_w << (*input_rna) << "+" << new_defined_rna;
         inp_w.close(input_mfe);
@@ -412,8 +409,17 @@ int aff_reducer(float   aff,
                complex_struct[0] != '('   )
         inp_r.close();
 
-        for (int i = 0; i < *number_of_links; i++)
-        defined_rna_in_compl_struct
+        complex_struct.erase(complex_struct.begin() + undefined_rna.length(),
+                             complex_struct.end()                            );
+        string_inverser(&complex_struct);
+
+        aff_reducer_2(&input_rna,
+                      &complex_struct,
+                      &new_defined_rna,
+                      &undefined_rna,
+                      &target_struct,
+                      &new_aff,
+                      new_aff          );
 
     } else
 
