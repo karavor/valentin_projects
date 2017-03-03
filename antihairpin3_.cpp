@@ -336,10 +336,9 @@ int aff_reducer_2(string* input_rna,
                   float*  new_aff,
                   float   aff)
 {
-
-    for (int i = 0; i < (*complex_struct).length(); i++)
+    for (int i = 0; i < l; i++)
     {
-        if ( (*complex_struct)[i] == '(' )
+        if ( (*complex_struct)[i] == ')' )
         {
             switch((*undefined_rna)[i])
             {
@@ -367,6 +366,65 @@ int aff_reducer_2(string* input_rna,
     return 0; // aff didn't start change significantly
 }
 
+void out_of_complex_right_brackets_deleter (string* complex_struct)
+{
+    int l = (*complex_struct).length();
+    int brakets_counter;
+    for (int i = 0; i < l; i++)
+    {
+        if ((*complex_struct)[i] == '(')
+        {
+            brakets_counter = 0;
+            for (int j = i; j < l; j++)
+            {
+                switch((*complex_struct)[j])
+                {
+                    case '(':
+                        brakets_counter++;
+                        break;
+                    case ')':
+                        brakets_counter--;
+                }
+                if (brakets_counter == 0)
+                {
+                    (*complex_struct)[j] = '.';
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void target_olig_structure_part_in_complex_reader (string* new_defined_rna,
+                                                   string* input_rna,
+                                                   string* complex_struct)
+{
+    ifstream inp_r;
+    ofstream inp_w;
+    inp_w.open(input_mfe);
+    inp_w << (*input_rna) << "+" << (*new_defined_rna);
+    inp_w.close(input_mfe);
+
+    system(DESIGN_FUNC);
+
+    inp_r.open(output_mfe);
+    do getline(inp_r, *complex_struct);
+    while ((*complex_struct)[0] != '.' &&
+           (*complex_struct)[0] != '('   )
+    inp_r.close();
+
+    (*complex_struct).erase((*complex_struct).begin(),
+                            (*complex_struct).begin() +
+                            (*complex_struct).find('+') + 1);
+    out_of_complex_right_brackets_deleter (complex_struct);
+}
+
+careful_aff_reducer()
+{
+    out_of_complex_right_brackets_deleter (complex_struct);
+
+}
+
 int aff_reducer(float   aff,
                 float   target_aff,
                 float   target_aff_accuracy,
@@ -385,8 +443,6 @@ int aff_reducer(float   aff,
 
     float new_aff;
     string complex_struct;
-    ifstream inp_r;
-    ofstream inp_w;
     if (!aff_reducer_1(input_rna,          // aff didn't start change significantly
                        &new_defined_rna,
                        &undefined_rna,
@@ -397,23 +453,10 @@ int aff_reducer(float   aff,
                        HNL)               )
     {
         undefined_rna = new_defined_rna;
-        inp_w.open(input_mfe);
-        inp_w << (*input_rna) << "+" << new_defined_rna;
-        inp_w.close(input_mfe);
-
-        system(DESIGN_FUNC);
-
-        inp_r.open(output_mfe);
-        do getline(inp_r, complex_struct);
-        while (complex_struct[0] != '.' &&
-               complex_struct[0] != '('   )
-        inp_r.close();
-
-        complex_struct.erase(complex_struct.begin() + undefined_rna.length(),
-                             complex_struct.end()                            );
-        string_inverser(&complex_struct);
-
-        aff_reducer_2(&input_rna,
+        target_olig_structure_part_in_complex_reader (&new_defined_rna,
+                                                      input_rna,
+                                                      &complex_struct);
+        aff_reducer_2(input_rna,
                       &complex_struct,
                       &new_defined_rna,
                       &undefined_rna,
@@ -421,7 +464,11 @@ int aff_reducer(float   aff,
                       &new_aff,
                       new_aff          );
 
-    } else
+    }
+    target_olig_structure_part_in_complex_reader (&new_defined_rna,
+                                                  input_rna,
+                                                  &complex_struct);
+    careful_aff_reducer();
 
     //string rna_complex = (*input_rna) + "+" + (*defined_rna);
 }
