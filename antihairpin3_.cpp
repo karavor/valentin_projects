@@ -16,6 +16,11 @@ const char* statistic     = "./output/statistic";
 const char* conc_input    = "./input/complex.in"; // file complex.con should exist
 const char* conc_output   = "./input/complex.eq";
 
+const int GEN_NEXT  = 0; //ok, print and continue
+const int GEN_TERM  = 1 ;//ok, terminate
+const int GEN_EMPTY = 2; //ok, print EMPTY SET and continue
+const int GEN_ERROR = 3;
+
 const char* mfe_variants[4] = {"./input/var_1",
                                "./input/var_2",
                                "./input/var_3",
@@ -328,6 +333,22 @@ int aff_reducer_1(string* input_rna,      //it's like simple total antihairpin (
     return 0; // aff didn't start change significantly
 }
 
+char except_ncltd_symb (char ncltd)
+{
+    switch(ncltd)
+    {
+        case 'C':
+            return 'D';
+        case 'G':
+            return 'H';
+        case 'A':
+            return 'B';
+        case 'U':
+            return 'V';
+    }
+    return 'E';
+}
+
 int aff_reducer_2(string* input_rna,
                   string* complex_struct,
                   string* new_defined_rna,
@@ -340,21 +361,7 @@ int aff_reducer_2(string* input_rna,
     {
         if ( (*complex_struct)[i] == ')' )
         {
-            switch((*undefined_rna)[i])
-            {
-                case 'C':
-                    (*undefined_rna)[i] = 'D';
-                    break;
-                case 'G':
-                    (*undefined_rna)[i] = 'H';
-                    break;
-                case 'A':
-                    (*undefined_rna)[i] = 'B';
-                    break;
-                case 'U':
-                    (*undefined_rna)[i] = 'V';
-                    break;
-            }
+            (*undefined_rna)[i] = except_ncltd_symb ((*undefined_rna)[i]);
             design_maker(target_struct,
                          undefined_rna,
                          new_defined_rna);
@@ -419,10 +426,147 @@ void target_olig_structure_part_in_complex_reader (string* new_defined_rna,
     out_of_complex_right_brackets_deleter (complex_struct);
 }
 
-careful_aff_reducer()
+int fctrl (int n)
 {
-    out_of_complex_right_brackets_deleter (complex_struct);
+    if (n == 1) return 1;
+    return n*fctrl(n-1);
+}
 
+int C_n_k  (int n, int k)
+{
+    return ( (int)(fctrl(n)/fctrl(n-k)/fctrl(k)) );
+}
+
+int gen_comb_norep_lex_init(int *arr, const int n, const int k)
+{
+int j; //index
+
+//test for special cases
+if(k > n)
+ return(GEN_ERROR);
+
+if(k == 0)
+ return(GEN_EMPTY);
+
+//initialize: arr[0, ..., k - 1] are 0, ..., k - 1
+for(j = 0; j < k; j++)
+ arr[j] = j;
+
+return(GEN_NEXT);
+}
+
+int gen_comb_norep_lex_next(int *arr, const int n, const int k)
+{
+int j; //index
+
+//easy case, increase rightmost element
+if(arr[k - 1] < n - 1)
+ {
+ arr[k - 1]++;
+ return(GEN_NEXT);
+ }
+
+//find rightmost element to increase
+for(j = k - 2; j >= 0; j--)
+ if(arr[j] < n - k + j)
+  break;
+
+//terminate if arr[0] == n - k
+if(j < 0)
+ return(GEN_TERM);
+
+//increase
+arr[j]++;
+
+//set right-hand elements
+while(j < k - 1)
+ {
+ arr[j + 1] = arr[j] + 1;
+ j++;
+ }
+
+return(GEN_NEXT);
+}
+
+int comb_maker(int** arr_, int n, int k, int nmb)
+{
+    int arr[k];
+    int           gen_result;         //return value of generation functions
+    int           x;                  //iterator
+    //initialize
+    gen_result = gen_comb_norep_lex_init(arr, n, k);
+    for (int i = 0; i < k; i++)
+        arr_[0][i] = arr[i];
+
+    if(gen_result == GEN_ERROR)
+        return(EXIT_FAILURE);
+
+    int n_numb = 1;
+    while(gen_result == GEN_NEXT)
+     {
+         //for(x = 0; x < k; x++)
+            //cout << arr[x] << ' ';
+
+         //cout << endl;
+
+         gen_result = gen_comb_norep_lex_next(arr, n, k); if(n_numb == nmb) return 0;
+         for (int i = 0; i < k; i++)
+            arr_[n_numb][i] = arr[i];
+         n_numb++;
+     }
+
+    return(EXIT_SUCCESS);
+}
+
+
+careful_aff_reducer(string* complex_struct,
+                    string* undefined_rna,
+                    string* new_defined_rna,
+                    string* target_struct)
+{
+    int ncltds_in_cmplx_nmbs [(*complex_struct).length()];
+    int cmplx_nmb_of_links = 0;
+    for (int i = 0; i < (*complex_struct).length(); i++)
+    {
+        if ( (*complex_struct)[i] == ')' )
+        {
+            ncltds_in_cmplx_nmbs[cmplx_nmb_of_links] = i;
+            cmplx_nmb_of_links++;
+        }
+    }
+    int** arr = new int* [cmplx_nmb_of_links];
+    int mut_variants_nmb;
+    int temp_var;
+    new_defined_rna;
+    for(int mutant_ncltd_numb = 1; ; mutant_ncltd_numb++)
+    {
+        mut_variants_nmb = C_n_k(cmplx_nmb_of_links, mutant_ncltd_numb);
+        for (int i = 0; i < mut_variants_nmb; i++)
+            arr[i] = new int [mutant_ncltd_numb];
+
+        comb_maker (arr, cmplx_nmb_of_links, mutant_ncltd_numb, mut_variants_nmb);
+
+        for (int i = 0; i < mut_variants_nmb; i++)
+        {
+            for (int j = 0; j < mutant_ncltd_numb; j++)
+            {
+                temp_var = ncltds_in_cmplx_nmbs[ arr[i][j] ];
+                (*undefined_rna)[temp_var] = except_ncltd_symb ((*undefined_rna)[temp_var]);
+            }
+            design_maker(target_struct, undefined_rna, defined);
+        }
+
+        for (int i = 0; i < mut_variants_nmb; i++)
+            delete [] arr[i];
+    }
+    delete [] arr;
+
+    for (int i = 0; i < mut_variants_nmb; i++)
+    {
+        for (int j = 0; j < k; j++)
+            cout << arr[i][j] << ' ';
+        cout << endl;
+    }
 }
 
 int aff_reducer(float   aff,
@@ -468,6 +612,12 @@ int aff_reducer(float   aff,
     target_olig_structure_part_in_complex_reader (&new_defined_rna,
                                                   input_rna,
                                                   &complex_struct);
+    if ( abs(new_aff - target_aff) < target_aff_accuracy )
+    {
+        (*defined_rna) = new_defined_rna;
+        return 0;
+    }
+    undefined_rna = new_defined_rna;
     careful_aff_reducer();
 
     //string rna_complex = (*input_rna) + "+" + (*defined_rna);
