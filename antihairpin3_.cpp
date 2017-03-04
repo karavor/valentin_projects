@@ -426,7 +426,7 @@ void target_olig_structure_part_in_complex_reader (string* new_defined_rna,
     out_of_complex_right_brackets_deleter (complex_struct);
 }
 
-int fctrl (int n)
+long int fctrl (int n)
 {
     if (n == 1) return 1;
     return n*fctrl(n-1);
@@ -519,10 +519,12 @@ int comb_maker(int** arr_, int n, int k, int nmb)
 }
 
 
-careful_aff_reducer(string* complex_struct,
-                    string* undefined_rna,
-                    string* new_defined_rna,
-                    string* target_struct)
+void careful_aff_reducer(string* complex_struct,
+                         string* undefined_rna,
+                         string* new_defined_rna,
+                         string* target_struct,
+                         string* input_rna,
+                         float   target_aff      )
 {
     int ncltds_in_cmplx_nmbs [(*complex_struct).length()];
     int cmplx_nmb_of_links = 0;
@@ -534,39 +536,57 @@ careful_aff_reducer(string* complex_struct,
             cmplx_nmb_of_links++;
         }
     }
-    int** arr = new int* [cmplx_nmb_of_links];
+    int*** arr = new int**[1];
     int mut_variants_nmb;
     int temp_var;
-    new_defined_rna;
+    string new_def_rna = (*new_defined_rna);
+    string best_def_rna;
+    string old_best_def_rna;
+    float d_aff;
+    float min_d_aff = target_aff;
+    float old_min_d_aff = target_aff;
     for(int mutant_ncltd_numb = 1; ; mutant_ncltd_numb++)
     {
         mut_variants_nmb = C_n_k(cmplx_nmb_of_links, mutant_ncltd_numb);
+        arr[0] = new int* [mut_variants_nmb];
         for (int i = 0; i < mut_variants_nmb; i++)
-            arr[i] = new int [mutant_ncltd_numb];
+            arr[0][i] = new int [mutant_ncltd_numb];
 
-        comb_maker (arr, cmplx_nmb_of_links, mutant_ncltd_numb, mut_variants_nmb);
+        comb_maker (arr[0], cmplx_nmb_of_links, mutant_ncltd_numb, mut_variants_nmb);
 
         for (int i = 0; i < mut_variants_nmb; i++)
         {
             for (int j = 0; j < mutant_ncltd_numb; j++)
             {
-                temp_var = ncltds_in_cmplx_nmbs[ arr[i][j] ];
+                temp_var = ncltds_in_cmplx_nmbs[ arr[0][i][j] ];
                 (*undefined_rna)[temp_var] = except_ncltd_symb ((*undefined_rna)[temp_var]);
             }
-            design_maker(target_struct, undefined_rna, defined);
-        }
+            design_maker(target_struct, undefined_rna, &new_def_rna);
+            d_aff = abs( aff_reader(input_rna, &new_def_rna) - target_aff );
 
+            if (d_aff < min_d_aff)
+            {
+                min_d_aff = d_aff;
+                best_def_rna = new_def_rna;
+            }
+            for (int j = 0; j < mutant_ncltd_numb; j++)
+            {
+                temp_var = ncltds_in_cmplx_nmbs[ arr[0][i][j] ];
+                (*undefined_rna)[temp_var] = (*new_defined_rna)[temp_var];
+            }
+        }
+        if (min_d_aff > old_min_d_aff)
+        {
+            (*new_defined_rna) = old_best_def_rna;
+            break;
+        }
+        old_best_def_rna = best_def_rna;
+        old_min_d_aff = min_d_aff;
+        min_d_aff = target_aff;
         for (int i = 0; i < mut_variants_nmb; i++)
-            delete [] arr[i];
+            delete [] arr[0][i];
     }
     delete [] arr;
-
-    for (int i = 0; i < mut_variants_nmb; i++)
-    {
-        for (int j = 0; j < k; j++)
-            cout << arr[i][j] << ' ';
-        cout << endl;
-    }
 }
 
 int aff_reducer(float   aff,
