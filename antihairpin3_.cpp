@@ -381,7 +381,7 @@ int aff_reducer_2(string* input_rna,
                   float*  new_aff,
                   float   aff)
 {
-    for (int i = 0; i < l; i++)
+    for (int i = 0; i < (*complex_struct).length(); i++)
     {
         if ( (*complex_struct)[i] == ')' )
         {
@@ -434,14 +434,14 @@ void target_olig_structure_part_in_complex_reader (string* new_defined_rna,
     ofstream inp_w;
     inp_w.open(input_mfe);
     inp_w << (*input_rna) << "+" << (*new_defined_rna);
-    inp_w.close(input_mfe);
+    inp_w.close();
 
-    system(DESIGN_FUNC);
+    system(MFE_FUNC);
 
     inp_r.open(output_mfe);
     do getline(inp_r, *complex_struct);
     while ((*complex_struct)[0] != '.' &&
-           (*complex_struct)[0] != '('   )
+           (*complex_struct)[0] != '('   );
     inp_r.close();
 
     (*complex_struct).erase((*complex_struct).begin(),
@@ -646,21 +646,27 @@ float aff_reducer(float   aff,
 {
     string undefined_rna = (*defined_rna);
     string target_struct;
-    string new_defined_rna;
+    string new_defined_rna = (*defined_rna);
 
     for (int i = 0; i < (*defined_rna).length(); i++)
         target_struct.push_back('.');
 
     float new_aff;
     string complex_struct;
-    if (!aff_reducer_1(input_rna,          // aff didn't start change significantly
+
+    //ofstream test_w;
+    //test_w.open("./input/last_olig");
+    if (aff < 100)
+        goto goto_label;
+
+    if ( aff_reducer_1(input_rna,          // aff didn't start change significantly
                        &new_defined_rna,
                        &undefined_rna,
                        &target_struct,
                        &number_of_links,
                        &new_aff,
                        aff,
-                       HNL)               )
+                       HNL)               == 0 )
     {
         undefined_rna = new_defined_rna;
         target_olig_structure_part_in_complex_reader (&new_defined_rna,
@@ -673,8 +679,11 @@ float aff_reducer(float   aff,
                       &target_struct,
                       &new_aff,
                       new_aff          );
-
     }
+    //test_w.close();
+
+    //return new_aff;
+    goto_label:
     target_olig_structure_part_in_complex_reader (&new_defined_rna,
                                                   input_rna,
                                                   &complex_struct);
@@ -718,7 +727,7 @@ int end_program_check (float     dG,
     {
         if ( aff - target_aff > target_aff_accuracy )
         {
-            new_aff = aff_reducer(aff,
+            new_aff = aff_reducer(aff,              //here dG can decrease!
                                   target_aff,
                                   target_aff_accuracy,
                                   defined_rna,
