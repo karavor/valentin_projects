@@ -210,6 +210,30 @@ float dG_and_struct_reader (string* seq,
     return free_energy;
 }
 
+float dG_reader (string* seq)
+{
+    ofstream w;
+    w.open(input_mfe);
+    w << *seq;
+    w.close();
+
+    system(MFE_FUNC);
+
+    string temporal_str;
+    float free_energy;
+
+    ifstream r;
+    r.open(output_mfe);
+
+    do    {getline(r, temporal_str);}
+    while (temporal_str[0] != '-' &&
+           temporal_str[0] != '0'    );
+
+    decimal_numb_reader( &temporal_str, 0, &free_energy );
+    return free_energy;
+}
+
+
 int max_arr_elem_numb (float* arr, int arr_length)
 {
     int max_elem_numb = 0;
@@ -426,9 +450,9 @@ void target_olig_structure_part_in_complex_reader (string* new_defined_rna,
     out_of_complex_right_brackets_deleter (complex_struct);
 }
 
-long int fctrl (int n)
+double fctrl (int n)
 {
-    if (n == 1) return 1;
+    if (n == 1 || n == 0) return 1;
     return n*fctrl(n-1);
 }
 
@@ -519,12 +543,14 @@ int comb_maker(int** arr_, int n, int k, int nmb)
 }
 
 
-void careful_aff_reducer(string* complex_struct,
+int careful_aff_reducer( string* complex_struct,
                          string* undefined_rna,
                          string* new_defined_rna,
                          string* target_struct,
                          string* input_rna,
-                         float   target_aff      )
+                         float   target_aff,
+                         float   target_aff_accuracy,
+                         float*  new_aff)
 {
     int ncltds_in_cmplx_nmbs [(*complex_struct).length()];
     int cmplx_nmb_of_links = 0;
@@ -539,12 +565,14 @@ void careful_aff_reducer(string* complex_struct,
     int*** arr = new int**[1];
     int mut_variants_nmb;
     int temp_var;
-    string new_def_rna = (*new_defined_rna);
+    string new_def_rna;
     string best_def_rna;
     string old_best_def_rna;
     float d_aff;
     float min_d_aff = target_aff;
     float old_min_d_aff = target_aff;
+    int break_flag = 0;
+
     for(int mutant_ncltd_numb = 1; ; mutant_ncltd_numb++)
     {
         mut_variants_nmb = C_n_k(cmplx_nmb_of_links, mutant_ncltd_numb);
@@ -562,12 +590,17 @@ void careful_aff_reducer(string* complex_struct,
                 (*undefined_rna)[temp_var] = except_ncltd_symb ((*undefined_rna)[temp_var]);
             }
             design_maker(target_struct, undefined_rna, &new_def_rna);
-            d_aff = abs( aff_reader(input_rna, &new_def_rna) - target_aff );
+            d_aff = aff_reader(input_rna, &new_def_rna)  - target_aff;
 
-            if (d_aff < min_d_aff)
+            if ( abs(d_aff) < abs(min_d_aff) )
             {
                 min_d_aff = d_aff;
                 best_def_rna = new_def_rna;
+                if ( abs(min_d_aff) < target_aff_accuracy)
+                {
+                    break_flag = 1;
+                    break;
+                }
             }
             for (int j = 0; j < mutant_ncltd_numb; j++)
             {
@@ -575,9 +608,20 @@ void careful_aff_reducer(string* complex_struct,
                 (*undefined_rna)[temp_var] = (*new_defined_rna)[temp_var];
             }
         }
-        if (min_d_aff > old_min_d_aff)
+        if (break_flag)
         {
+            for (int i = 0; i < mut_variants_nmb; i++)
+                delete [] arr[0][i];
+            (*new_defined_rna) = best_def_rna;
+            (*new_aff) = target_aff + min_d_aff;
+            break;
+        }
+        if ( abs(min_d_aff) > abs(old_min_d_aff) )
+        {
+            for (int i = 0; i < mut_variants_nmb; i++)
+                delete [] arr[0][i];
             (*new_defined_rna) = old_best_def_rna;
+            (*new_aff) = target_aff + old_min_d_aff;
             break;
         }
         old_best_def_rna = best_def_rna;
@@ -586,17 +630,19 @@ void careful_aff_reducer(string* complex_struct,
         for (int i = 0; i < mut_variants_nmb; i++)
             delete [] arr[0][i];
     }
+    delete [] arr[0];
     delete [] arr;
+    return 1;
 }
 
-int aff_reducer(float   aff,
-                float   target_aff,
-                float   target_aff_accuracy,
-                string* defined_rna,
-                string* defined_rna_struct,
-                string* input_rna,
-                int     number_of_links,
-                hairpin_nucleotide_links*  HNL)
+float aff_reducer(float   aff,
+                  float   target_aff,
+                  float   target_aff_accuracy,
+                  string* defined_rna,
+                  string* defined_rna_struct,
+                  string* input_rna,
+                  int     number_of_links,
+                  hairpin_nucleotide_links*  HNL)
 {
     string undefined_rna = (*defined_rna);
     string target_struct;
@@ -635,11 +681,19 @@ int aff_reducer(float   aff,
     if ( abs(new_aff - target_aff) < target_aff_accuracy )
     {
         (*defined_rna) = new_defined_rna;
-        return 0;
+        return new_aff;
     }
     undefined_rna = new_defined_rna;
-    careful_aff_reducer();
-
+    careful_aff_reducer( &complex_struct,
+                         &undefined_rna,
+                         &new_defined_rna,
+                         &target_struct,
+                         input_rna,
+                         target_aff,
+                         target_aff_accuracy,
+                         &new_aff);
+    (*defined_rna) = new_defined_rna;
+    return new_aff;
     //string rna_complex = (*input_rna) + "+" + (*defined_rna);
 }
 
@@ -656,20 +710,32 @@ int end_program_check (float     dG,
                        int       number_of_links,
                        hairpin_nucleotide_links*  HNL)
 {
+    float new_aff,
+          new_dG;
     if ( abs(dG - target_hairpin_dG) < target_dG_accuracy
                                                           ||
          dG > target_hairpin_dG                             )
     {
         if ( aff - target_aff > target_aff_accuracy )
         {
-            aff_reducer(aff,
-                        target_aff,
-                        target_aff_accuracy,
-                        defined_rna,
-                        defined_rna_struct,
-                        input_rna,
-                        number_of_links,
-                        HNL                 );
+            new_aff = aff_reducer(aff,
+                                  target_aff,
+                                  target_aff_accuracy,
+                                  defined_rna,
+                                  defined_rna_struct,
+                                  input_rna,
+                                  number_of_links,
+                                  HNL                 );
+
+            new_dG = dG_reader(defined_rna);
+            (*output_w) << (*defined_rna) << '\t'
+                        << new_aff << '\t'
+                        << new_dG  << '\t';
+            if ( abs(new_aff - target_aff) < target_aff_accuracy )
+            {
+                (*output_w) << '+' << endl;
+            }
+            else (*output_w) << '-' << endl;
         }
         else
         {
