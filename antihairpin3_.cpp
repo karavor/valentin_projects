@@ -767,6 +767,7 @@ int anti_hairpin  (string* undefined_rna,
                    string* defined_rna,
                    string* input_rna,
                    float   initial_dG,
+                   float   initial_cmplx_dG,
                    float   initial_aff,
                    hairpin_nucleotide_links*  HNL,
                    int*    number_of_links,
@@ -838,6 +839,7 @@ int anti_hairpin  (string* undefined_rna,
     ofstream input_w;
     ifstream output_r;
     //*bigstat_w << "variants" << '\t';
+    string complex_seq;
     for (int j = 0; j < 4; j++)
     {
         new_undefined_rna = *undefined_rna;
@@ -877,12 +879,13 @@ int anti_hairpin  (string* undefined_rna,
                                       &new_number_of_links);//*bigstat_w << new_dG << '\t';
 
         new_aff = aff_reader(input_rna, &new_defined_rna);
+        complex_seq = (*input_rna) + "+" + new_defined_rna;
 
         antihairpin_index[j]   = (new_dG - initial_dG) / abs(initial_dG); //*bigstat_w << antihairpin_index[j] << '\t';// higher is better
-        lost_affinity_index[j] = (initial_aff - new_aff) / initial_aff;   //*bigstat_w << lost_affinity_index[j] << '\t';// lower is better
-        if (lost_affinity_index[j] < abs(antihairpin_index[j]/10))
-            mutation_comparison_table[j] = abs (antihairpin_index[j]);
-        else
+        lost_affinity_index[j] = abs( (initial_cmplx_dG - dG_reader(&complex_seq)) / initial_cmplx_dG );   //*bigstat_w << lost_affinity_index[j] << '\t';// lower is better
+        //if (lost_affinity_index[j] < abs(antihairpin_index[j]/10))
+            //mutation_comparison_table[j] = abs (antihairpin_index[j]);
+        //else
             mutation_comparison_table[j] =                     // how many percents of hairpin destruction
             abs (antihairpin_index[j]/lost_affinity_index[j]); // we have on one percent of affinity loss
         input_w.open(mfe_variants[j]); //*bigstat_w << mutation_comparison_table[j] << endl << '\t';
@@ -1023,12 +1026,15 @@ int main_work  (string*   input_rna,
     int break_flag = 0;
     //ofstream bigstat_w;
     //bigstat_w.open("./output/bigstat");
+    string complex_seq = (*input_rna) + "+" + defined_rna;
+    float initial_cmplx_dG = dG_reader(&complex_seq);
     for ( int i = 0; i < max_loop_size; i++ )
     {
         if (anti_hairpin(&undefined_rna,
                          &defined_rna,
                          input_rna,
                          initial_dG,
+                         initial_cmplx_dG,
                          initial_aff,
                          HNL,
                          &number_of_links,
