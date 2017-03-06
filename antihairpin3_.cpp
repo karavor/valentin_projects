@@ -326,6 +326,7 @@ int aff_reducer_1(string* input_rna,      //it's like simple total antihairpin (
                   float   aff,
                   hairpin_nucleotide_links*  HNL)
 {
+    string last_variant = (*new_defined_rna);
     for (int i = 0; i < *number_of_links; i++)
     {
         if ( (*undefined_rna)[HNL[i].first_nucleotide_number_in_link - 1] == 'N' )
@@ -336,7 +337,11 @@ int aff_reducer_1(string* input_rna,      //it's like simple total antihairpin (
                      new_defined_rna);
         *new_aff = aff_reader (input_rna, new_defined_rna);
         if ( aff - *new_aff > absolute_aff_changing ) // aff started change significantly
+        {
+            (*new_defined_rna) = last_variant;
             return 1;
+        }
+        last_variant = (*new_defined_rna);
     }
     string temp_str;
     if (dG_and_struct_reader (new_defined_rna,
@@ -381,6 +386,7 @@ int aff_reducer_2(string* input_rna,
                   float*  new_aff,
                   float   aff)
 {
+    string last_variant = (*new_defined_rna);
     for (int i = 0; i < (*complex_struct).length(); i++)
     {
         if ( (*complex_struct)[i] == ')' )
@@ -391,7 +397,11 @@ int aff_reducer_2(string* input_rna,
                          new_defined_rna);
             *new_aff = aff_reader (input_rna, new_defined_rna);
             if ( aff - *new_aff > absolute_aff_changing ) // aff started change significantly
+            {
+                (*new_defined_rna) = last_variant;
                 return 1;
+            }
+            last_variant = (*new_defined_rna);
         }
     }
     return 0; // aff didn't start change significantly
@@ -840,6 +850,8 @@ int anti_hairpin  (string* undefined_rna,
     ifstream output_r;
     //*bigstat_w << "variants" << '\t';
     string complex_seq;
+    int max_dist_last_HNL_element_number = i;
+
     for (int j = 0; j < 4; j++)
     {
         new_undefined_rna = *undefined_rna;
@@ -907,7 +919,7 @@ int anti_hairpin  (string* undefined_rna,
     *lost_affinity_index_ = lost_affinity_index[i];
 
     output_r.open(mfe_variants[i]);
-    getline(output_r, *undefined_rna);
+    getline(output_r, new_undefined_rna);
     getline(output_r, *defined_rna);
     getline(output_r, new_rna_struct);
 
@@ -917,7 +929,7 @@ int anti_hairpin  (string* undefined_rna,
     getline(output_r, temp_str);
     decimal_numb_reader(&temp_str, 0, &new_aff);
 
-    *stat_w << *undefined_rna << endl << endl;
+    *stat_w << new_undefined_rna << endl << endl;
     *stat_w << *defined_rna          << '\t'
           << new_dG                 << '\t'
           << new_aff         << '\t'
@@ -935,6 +947,26 @@ int anti_hairpin  (string* undefined_rna,
         getline(output_r, temp_str);
         links_reader(&HNL[l], &temp_str);
     }
+
+    int break_f = 1;
+    for (int f = 0; f < new_undefined_rna.length(); f++)
+        {
+            if ( new_undefined_rna[f] != (*undefined_rna)[f] )
+            {
+                break_f = 0;
+                break;
+            }
+        }
+    if (break_f)
+    {
+        for (int k = max_dist_last_HNL_element_number; k >= max_dist_HNL_element_number; k--)
+        {
+            new_undefined_rna[ HNL[k].first_nucleotide_number_in_link  - 1] =  'N';
+            new_undefined_rna[ HNL[k].second_nucleotide_number_in_link  - 1] =  'N';
+        }
+    }
+    (*undefined_rna) = new_undefined_rna;
+
     if (end_program_check(new_dG,
                           target_hairpin_dG,
                           target_dG_accuracy,
