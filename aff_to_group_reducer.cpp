@@ -20,7 +20,6 @@ const int GEN_TERM  = 1 ;//ok, terminate
 const int GEN_EMPTY = 2; //ok, print EMPTY SET and continue
 const int GEN_ERROR = 3;
 
-const int   absolute_aff_changing = 1;
 #define MFE_FUNC "\
     #/bin/bash \n\
     export NUPACKHOME=/home/valentin/work_backup/nupack \n\
@@ -46,13 +45,6 @@ struct anti_aff_olig
     string seq;
     string cmplx_struct_part;
     float aff;
-};
-
-struct hairpin_nucleotide_links
-{
-    float first_nucleotide_number_in_link;
-    float second_nucleotide_number_in_link;
-    float distance_between_nucleotides;
 };
 
 void string_inverser (string* s)
@@ -155,17 +147,6 @@ void design_maker (string* target_struct, //read
     output_r.close();
 }
 
-void links_reader(hairpin_nucleotide_links* HNL,
-                  string*                   link_string)
-{
-    decimal_numb_reader(link_string,
-                        decimal_numb_reader(link_string, 0, &(*HNL).first_nucleotide_number_in_link),
-                        &(*HNL).second_nucleotide_number_in_link);
-
-    (*HNL).distance_between_nucleotides = (*HNL).second_nucleotide_number_in_link -
-                                          (*HNL).first_nucleotide_number_in_link;
-}
-
 float dG_reader (string* seq)
 {
     ofstream w;
@@ -188,43 +169,6 @@ float dG_reader (string* seq)
     decimal_numb_reader( &temporal_str, 0, &free_energy );
     return free_energy;
 }
-
-
-float dG_and_struct_reader (string* seq,
-                            string* seq_struct,
-                            hairpin_nucleotide_links*  HNL,
-                            int*    number_of_links)
-{
-    ofstream w;
-    w.open(input_mfe);
-    w << *seq;
-    w.close();
-
-    system(MFE_FUNC);
-    string temporal_str;
-    float free_energy;
-
-    ifstream r;
-    r.open(output_mfe);
-    do    {getline(r, temporal_str);}
-    while (temporal_str[0] != '-' &&
-           temporal_str[0] != '0'    );
-    decimal_numb_reader( &temporal_str, 0, &free_energy );
-    int i = 0;
-    getline(r, *seq_struct);
-    do
-    {
-        getline(r, temporal_str);
-        links_reader(&HNL[i],&temporal_str);
-        i++;
-    }
-    while (temporal_str[0] != '%');
-    *number_of_links = i - 1;
-
-    r.close();
-    return free_energy;
-}
-
 
 float aff_reader (string* seq_1, string* seq_2)
 {
@@ -361,129 +305,10 @@ char except_ncltd_symb (char ncltd)
             return 'B';
         case 'U':
             return 'V';
+        case 'T':
+            return 'V';
     }
     return 'E';
-}
-
-int careful_aff_reducer( string* complex_struct,
-                         string* undefined_rna,
-                         string* new_defined_rna,
-                         string* target_struct,
-                         string* input_rna,
-                         float   target_aff,
-                         float   target_aff_accuracy,
-                         float*  new_aff)
-{
-    int ncltds_in_cmplx_nmbs [(*complex_struct).length()];
-    int cmplx_nmb_of_links = 0;
-    for (int i = 0; i < (*complex_struct).length(); i++)
-    {
-        if ( (*complex_struct)[i] == ')' )
-        {
-            ncltds_in_cmplx_nmbs[cmplx_nmb_of_links] = i;
-            cmplx_nmb_of_links++;
-        }
-    }
-    int*** arr = new int**[1];
-    int mut_variants_nmb;
-    int temp_var;
-    string new_def_rna;
-    string best_def_rna;
-    string old_best_def_rna;
-    float d_aff;
-    float min_d_aff = target_aff;
-    float old_min_d_aff = target_aff;
-    int break_flag = 0;
-
-    for(int mutant_ncltd_numb = 1; ; mutant_ncltd_numb++)
-    {
-        mut_variants_nmb = C_n_k(cmplx_nmb_of_links, mutant_ncltd_numb);
-        arr[0] = new int* [mut_variants_nmb];
-        for (int i = 0; i < mut_variants_nmb; i++)
-            arr[0][i] = new int [mutant_ncltd_numb];
-
-        comb_maker (arr[0], cmplx_nmb_of_links, mutant_ncltd_numb, mut_variants_nmb);
-
-        for (int i = 0; i < mut_variants_nmb; i++)
-        {
-            for (int j = 0; j < mutant_ncltd_numb; j++)
-            {
-                temp_var = ncltds_in_cmplx_nmbs[ arr[0][i][j] ];
-                (*undefined_rna)[temp_var] = except_ncltd_symb ((*undefined_rna)[temp_var]);
-            }
-            design_maker(target_struct, undefined_rna, &new_def_rna);
-            d_aff = aff_reader(input_rna, &new_def_rna)  - target_aff;
-
-            if ( abs(d_aff) < abs(min_d_aff) )
-            {
-                min_d_aff = d_aff;
-                best_def_rna = new_def_rna;
-                if ( abs(min_d_aff) < target_aff_accuracy)
-                {
-                    break_flag = 1;
-                    break;
-                }
-            }
-            for (int j = 0; j < mutant_ncltd_numb; j++)
-            {
-                temp_var = ncltds_in_cmplx_nmbs[ arr[0][i][j] ];
-                (*undefined_rna)[temp_var] = (*new_defined_rna)[temp_var];
-            }
-        }
-        if (break_flag)
-        {
-            for (int i = 0; i < mut_variants_nmb; i++)
-                delete [] arr[0][i];
-            (*new_defined_rna) = best_def_rna;
-            (*new_aff) = target_aff + min_d_aff;
-            break;
-        }
-        if ( abs(min_d_aff) > abs(old_min_d_aff) )
-        {
-            for (int i = 0; i < mut_variants_nmb; i++)
-                delete [] arr[0][i];
-            (*new_defined_rna) = old_best_def_rna;
-            (*new_aff) = target_aff + old_min_d_aff;
-            break;
-        }
-        old_best_def_rna = best_def_rna;
-        old_min_d_aff = min_d_aff;
-        min_d_aff = target_aff;
-        for (int i = 0; i < mut_variants_nmb; i++)
-            delete [] arr[0][i];
-    }
-    delete [] arr[0];
-    delete [] arr;
-    return 1;
-}
-
-int aff_reducer_2(string* input_rna,
-                  string* complex_struct,
-                  string* new_defined_rna,
-                  string* undefined_rna,
-                  string* target_struct,
-                  float*  new_aff,
-                  float   aff)
-{
-    string last_variant = (*new_defined_rna);
-    for (int i = 0; i < (*complex_struct).length(); i++)
-    {
-        if ( (*complex_struct)[i] == ')' )
-        {
-            (*undefined_rna)[i] = except_ncltd_symb ((*undefined_rna)[i]);
-            design_maker(target_struct,
-                         undefined_rna,
-                         new_defined_rna);
-            *new_aff = aff_reader (input_rna, new_defined_rna);
-            if ( aff - *new_aff > absolute_aff_changing ) // aff started change significantly
-            {
-                (*new_defined_rna) = last_variant;
-                return 1;
-            }
-            last_variant = (*new_defined_rna);
-        }
-    }
-    return 0; // aff didn't start change significantly
 }
 
 void out_of_complex_right_brackets_deleter (string* complex_struct)
@@ -539,60 +364,153 @@ void target_olig_structure_part_in_complex_reader (string* new_defined_rna,
     out_of_complex_right_brackets_deleter (complex_struct);
 }
 
-int main()
-{   // DESIGN_FUNC MFE_FUNC CONCENTRATIONS_FUNC
-    //system(MFE_FUNC);
-    int oligs_nmb = 5;
-    float aff_min_level = 20;
-    float min_aff_to_target_olig = 80;
-    string target_rna = "CAAGCCACAGAUCCCCACGUUCAUUAAGCCGCC";
-    string input_rna  = "GCCGGCUCAAUGAGCGUGGGGAUCCCUGGCGUG";
-    anti_aff_olig AAO_table [oligs_nmb];
-    ifstream inp_r;
-    inp_r.open("./input/new_input")
-
-    for (int i = 0; i < oligs_nmb; i++)
-    {
-        getline(inp_r, AAO_table[i].seq);
-        AAO_table[i].aff = aff_reader(&input_rna, &(AAO_table[i].seq));
-        target_olig_structure_part_in_complex_reader( &(AAO_table[i].seq),
-                                                      &input_rna,
-                                                      &(AAO_table[i].cmplx_struct_part) );
-    }
-    inp_r.close();
-
-    int rna_length = input_rna.length();
-    int overlap_arr [rna_length];
-    int max_overlap_positions [rna_length];
-    int max_overlap_positions_nmb = 0;
-    int max_overlap_counter = 0;
-    int overlap_counter = 0;
-    string cmplx = target_rna + "+" + input_rna;
+int max_overlap_pstns_aff_to_gr_rdcr (string* best_new_def_rna,
+                                      int     oligs_nmb,
+                                      float   aff_min_level,
+                                      float   min_aff_to_target_olig,
+                                      string* target_rna,
+                                      string* input_rna,
+                                      int     rna_length,
+                                      anti_aff_olig* AAO_table,
+                                      int*    max_overlap_positions,
+                                      int     max_overlap_positions_nmb,
+                                      string* target_struct             )
+{
+    string cmplx = (*target_rna) + "+" + (*input_rna);
     float aff;
     float aff_to_target_olig;
     float initial_cmplx_dG = dG_reader(&cmplx);
-    float cmplx_dG = initial_cmplx_dG;
-    float antiaff_index = 0; //lower is better
-    float lost_aff_index = (initial_cmplx_dG - cmplx_dG)/initial_cmplx_dG; //lower is better
-    float evaluate_index = abs (lost_aff_index * antiaff_index);//lower is better
+    float cmplx_dG;// = initial_cmplx_dG;
+    float antiaff_index;
+    float old_best_antiaff_index = 100*oligs_nmb;
+    float best_antiaff_index = old_best_antiaff_index + 1;
+    int best_antiaff_index_update_flag;
+    float lost_aff_index;// = (initial_cmplx_dG - cmplx_dG)/initial_cmplx_dG; //lower is better
+    float evaluate_index;// = abs (lost_aff_index * antiaff_index);
+    float max_evaluate_index;
     int mut_variants_nmb;
+    int temp_var;
     int*** arr = new int**[1];
 
-    string undefined_rna = input_rna;
+    string undefined_rna = (*input_rna);
+    //int big_aff_oligs_nmb;
+    int break_flag = 0;
     string new_def_rna;
-    string target_struct;
-    for (int i = 0; i < rna_length; i++)
-        target_struct.push_back('.');
-/*
+    string old_best_def_rna = (*input_rna);
+    for(int mutant_ncltd_numb = 1; mutant_ncltd_numb < max_overlap_positions_nmb; mutant_ncltd_numb++)
+    {
+        max_evaluate_index = 0;
+        best_antiaff_index_update_flag = 0;
+        mut_variants_nmb = C_n_k(max_overlap_positions_nmb, mutant_ncltd_numb);
+        arr[0] = new int* [mut_variants_nmb];
+        for (int i = 0; i < mut_variants_nmb; i++)
+            arr[0][i] = new int [mutant_ncltd_numb];
+
+        comb_maker (arr[0], max_overlap_positions_nmb, mutant_ncltd_numb, mut_variants_nmb);
+
+        for (int i = 0; i < mut_variants_nmb; i++)
+        {
+            for (int j = 0; j < mutant_ncltd_numb; j++)
+            {
+                temp_var = max_overlap_positions[ arr[0][i][j] ];
+                undefined_rna[temp_var] = except_ncltd_symb (undefined_rna[temp_var]);// if big cycle CHANGES NEED
+            }
+            design_maker(target_struct, &undefined_rna, &new_def_rna);
+            aff_to_target_olig = aff_reader(target_rna, &new_def_rna);
+            if (aff_to_target_olig < min_aff_to_target_olig)
+            {
+                for (int j = 0; j < mutant_ncltd_numb; j++)
+                {
+                    temp_var = max_overlap_positions[ arr[0][i][j] ];
+                    undefined_rna[temp_var] = (*input_rna)[temp_var];
+                }
+                continue;
+            }
+            antiaff_index = 0;
+            //big_aff_oligs_nmb = 0;
+            for (int j = 0; j < oligs_nmb; j++)
+            {
+                aff = aff_reader(&new_def_rna, &(AAO_table[j].seq) );
+                if (aff > aff_min_level)
+                {
+                    antiaff_index += aff; //lower is better
+                    //big_aff_oligs_nmb++;
+                }
+            }
+            //if (big_aff_oligs_nmb == 0)
+                //big_aff_oligs_nmb = 1;
+
+            if (antiaff_index == 0)
+            {
+                break_flag = 1;
+                (*best_new_def_rna) = new_def_rna;
+                break; //we consider this variant as good
+            }
+
+            //antiaff_index = (100 - antiaff_index/big_aff_oligs_nmb)/100; //higher is better
+            cmplx = (*target_rna) + "+" + new_def_rna;
+            cmplx_dG = dG_reader(&cmplx);
+            lost_aff_index = (initial_cmplx_dG - cmplx_dG)/initial_cmplx_dG;// it's considered that cmplx_dG > initial_cmplx_dG, lower is better
+            evaluate_index = (1 - lost_aff_index) / antiaff_index; //higher is better
+
+            if (evaluate_index > max_evaluate_index)
+            {
+                max_evaluate_index = evaluate_index;
+                best_antiaff_index = antiaff_index;
+                best_antiaff_index_update_flag = 1;
+                (*best_new_def_rna) = new_def_rna;
+            }
+            for (int j = 0; j < mutant_ncltd_numb; j++)
+            {
+                temp_var = max_overlap_positions[ arr[0][i][j] ];
+                undefined_rna[temp_var] = (*input_rna)[temp_var]; //if big cycle best undefined_rna should be saved
+            }
+        }
+        if (break_flag)
+        {
+            for (int i = 0; i < mut_variants_nmb; i++)
+                delete [] arr[0][i];
+            break;
+        }
+        if ( (old_best_antiaff_index < best_antiaff_index) ||
+             (best_antiaff_index_update_flag == 0)           )
+        {
+            for (int i = 0; i < mut_variants_nmb; i++)
+                delete [] arr[0][i];
+            (*best_new_def_rna) = old_best_def_rna;
+            break_flag = 1;
+            break;
+        }
+        old_best_def_rna = (*best_new_def_rna);
+        old_best_antiaff_index = best_antiaff_index;
+
+        for (int i = 0; i < mut_variants_nmb; i++)
+            delete [] arr[0][i];
+    }
+    delete [] arr[0];
+    delete [] arr;
+    return break_flag;
+}
+
+void data_to_gr_reader_and_max_overlap_counter (int     oligs_nmb,
+                                                float   aff_min_level,
+                                                string* input_rna,
+                                                int     rna_length,
+                                                anti_aff_olig* AAO_table,
+                                                int*    max_overlap_positions,
+                                                int*    max_overlap_positions_nmb)
+{
+    int overlap_arr [rna_length];
+    int max_overlap_counter = 0;
+    int overlap_counter = 0;
+
     for (int i = 0; i < oligs_nmb; i++)
     {
-        aff = aff_reader(&new_def_rna, &(AAO_table[i].seq) );
-        if (aff > aff_min_level)
-        {
-            antiaff_index += aff;
-        }
+        AAO_table[i].aff = aff_reader(input_rna, &(AAO_table[i].seq));
+        target_olig_structure_part_in_complex_reader( input_rna,
+                                                      &(AAO_table[i].seq),
+                                                      &(AAO_table[i].cmplx_struct_part) );//here will be information about what ncltds in input_rna are connected with ncltds of AAO_table[i].seq
     }
-*/
     for (int j = 0; j < rna_length; j++)
     {
         overlap_counter = 0;
@@ -611,87 +529,73 @@ int main()
             max_overlap_counter = overlap_counter;
         }
     }
+    (*max_overlap_positions_nmb) = 0;
     for (int j = 0; j < rna_length; j++)
     {
         if (overlap_arr[j] == max_overlap_counter)
         {
-            max_overlap_positions [max_overlap_positions_nmb] = j;
-            max_overlap_positions_nmb++;
+            max_overlap_positions [(*max_overlap_positions_nmb)] = j;
+            (*max_overlap_positions_nmb)++;
         }
     }
-    for(int mutant_ncltd_numb = 1; mutant_ncltd_numb < max_overlap_positions_nmb; mutant_ncltd_numb++)
+}
+
+int main()
+{   // DESIGN_FUNC MFE_FUNC CONCENTRATIONS_FUNC
+    //system(MFE_FUNC);
+    int oligs_nmb = 5;//
+    float aff_min_level = 20;//
+    //float aff_min_level_accuracy = 5;
+    float min_aff_to_target_olig = 80;
+    string target_rna = "CAAGCCACAGAUCCCCACGUUCAUUAAGCCGCC";
+    string input_rna  = "GCCGGCUCAAUGAGCGUGGGGAUCCCUGGCGUG";//
+    int rna_length = input_rna.length();//
+    anti_aff_olig AAO_table [oligs_nmb];//
+
+    ifstream inp_r;
+    inp_r.open("./input/new_input");
+
+    for (int i = 0; i < oligs_nmb; i++)
+        getline(inp_r, AAO_table[i].seq);
+
+    inp_r.close();
+
+    int max_overlap_positions [rna_length];//+
+    int max_overlap_positions_nmb = 0;//+
+
+    string target_struct;//+
+    for (int i = 0; i < rna_length; i++)
+        target_struct.push_back('.');
+
+    string best_new_def_rna = input_rna;
+    int prog_breaker_flag = 0;
+
+    do
     {
-        mut_variants_nmb = C_n_k(max_overlap_positions_nmb, mutant_ncltd_numb);
-        arr[0] = new int* [mut_variants_nmb];
-        for (int i = 0; i < mut_variants_nmb; i++)
-            arr[0][i] = new int [mutant_ncltd_numb];
-
-        comb_maker (arr[0], max_overlap_positions_nmb, mutant_ncltd_numb, mut_variants_nmb);
-
-        for (int i = 0; i < mut_variants_nmb; i++)
+        if(prog_breaker_flag)
         {
-            for (int j = 0; j < mutant_ncltd_numb; j++)
-            {
-                temp_var = max_overlap_positions[ arr[0][i][j] ];
-                undefined_rna[temp_var] = except_ncltd_symb (undefined_rna[temp_var]);
-            }
-            design_maker(&target_struct, &undefined_rna, &new_def_rna);
-            aff_to_target_olig = aff_reader(&target_rna, &new_def_rna);
-            if (aff_to_target_olig < min_aff_to_target_olig)
-                continue;
-            antiaff_index = 0;
-            for (int j = 0; j < oligs_nmb; j++)
-            {
-                aff = aff_reader(&new_def_rna, &(AAO_table[j].seq) );
-                if (aff > aff_min_level)
-                {
-                    antiaff_index += aff;
-                }
-            }
-            cmplx = target_rna + "+" + input_rna;
-            cmplx_dG = dG_reader(&cmplx);
-            lost_aff_index = (initial_cmplx_dG - cmplx_dG)/initial_cmplx_dG;
-            evaluate_index = abs (lost_aff_index * antiaff_index);
-
-            if ( abs(d_aff) < abs(min_d_aff) )
-            {
-                min_d_aff = d_aff;
-                best_def_rna = new_def_rna;
-                if ( abs(min_d_aff) < target_aff_accuracy)
-                {
-                    break_flag = 1;
-                    break;
-                }
-            }
-            for (int j = 0; j < mutant_ncltd_numb; j++)
-            {
-                temp_var = ncltds_in_cmplx_nmbs[ arr[0][i][j] ];
-                (*undefined_rna)[temp_var] = (*new_defined_rna)[temp_var];
-            }
+            cout << "Enter any number to continue" << endl;
+            cin >> prog_breaker_flag;
         }
-        if (break_flag)
-        {
-            for (int i = 0; i < mut_variants_nmb; i++)
-                delete [] arr[0][i];
-            (*new_defined_rna) = best_def_rna;
-            (*new_aff) = target_aff + min_d_aff;
-            break;
-        }
-        if ( abs(min_d_aff) > abs(old_min_d_aff) )
-        {
-            for (int i = 0; i < mut_variants_nmb; i++)
-                delete [] arr[0][i];
-            (*new_defined_rna) = old_best_def_rna;
-            (*new_aff) = target_aff + old_min_d_aff;
-            break;
-        }
-        old_best_def_rna = best_def_rna;
-        old_min_d_aff = min_d_aff;
-        min_d_aff = target_aff;
-        for (int i = 0; i < mut_variants_nmb; i++)
-            delete [] arr[0][i];
+        data_to_gr_reader_and_max_overlap_counter (oligs_nmb,
+                                                   aff_min_level,
+                                                   &input_rna,
+                                                   rna_length,
+                                                   AAO_table,
+                                                   max_overlap_positions,
+                                                   &max_overlap_positions_nmb);
+        prog_breaker_flag = 1;
     }
-    undefined_rna[max_link_overlap_ncltd_nmb] = except_ncltd_symb[]
-
+    while ( max_overlap_pstns_aff_to_gr_rdcr (&best_new_def_rna,
+                                              oligs_nmb,
+                                              aff_min_level,
+                                              min_aff_to_target_olig,
+                                              &target_rna,
+                                              &input_rna,
+                                              rna_length,
+                                              AAO_table,
+                                              max_overlap_positions,
+                                              max_overlap_positions_nmb,
+                                              &target_struct             ) == 0 );
     return 0;
 }
