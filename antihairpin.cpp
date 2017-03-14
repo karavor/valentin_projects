@@ -153,30 +153,38 @@ struct hairpin_nucleotide_links
 #define MFE_FUNC "\
     #/bin/bash \n\
     export NUPACKHOME=/home/valentin/work_backup/nupack \n\
-    export CODDING_HOME=/home/valentin/work_backup/codding \n\
-    $NUPACKHOME/bin/mfe $CODDING_HOME/input/input_seq \n\
+    $NUPACKHOME/bin/mfe $PWD/input/input_seq \n\
 "
 #define DESIGN_FUNC "\
     #/bin/bash \n\
     export NUPACKHOME=/home/valentin/work_backup/nupack \n\
-    export CODDING_HOME=/home/valentin/work_backup/codding \n\
-    $NUPACKHOME/bin/design -loadseed $CODDING_HOME/input/input_seq \n\
+    $NUPACKHOME/bin/design -loadseed $PWD/input/input_seq \n\
 "
 
 #define CONCENTRATIONS_FUNC "\
     #/bin/bash \n\
     export NUPACKHOME=/home/valentin/work_backup/nupack \n\
-    export CODDING_HOME=/home/valentin/work_backup/codding \n\
-    $NUPACKHOME/bin/complexes -T 23 -material rna $CODDING_HOME/input/complex \n\
-    $NUPACKHOME/bin/concentrations $CODDING_HOME/input/complex \n\
+    $NUPACKHOME/bin/complexes -T 23 -material rna $PWD/input/complex \n\
+    $NUPACKHOME/bin/concentrations $PWD/input/complex \n\
 "
 
 #define CONCENTRATIONS_FUNC_DNA "\
     #/bin/bash \n\
     export NUPACKHOME=/home/valentin/work_backup/nupack \n\
-    export CODDING_HOME=/home/valentin/work_backup/codding \n\
-    $NUPACKHOME/bin/complexes -T 23 -material dna $CODDING_HOME/input/complex \n\
-    $NUPACKHOME/bin/concentrations $CODDING_HOME/input/complex \n\
+    $NUPACKHOME/bin/complexes -T 23 -material dna $PWD/input/complex \n\
+    $NUPACKHOME/bin/concentrations $PWD/input/complex \n\
+"
+
+#define CLEAN_FUNC "\
+    #/bin/bash \n\
+    rm $PWD/input/var* \n\
+    rm $PWD/input/input_seq.in \n\
+    rm $PWD/input/input_seq.fold \n\
+    rm $PWD/input/input_seq.summary \n\
+    rm $PWD/input/input_seq.mfe \n\
+    rm $PWD/input/complex.in \n\
+    rm $PWD/input/complex.eq \n\
+    rm $PWD/input/complex.cx \n\
 "
 
 void links_reader(hairpin_nucleotide_links* HNL,
@@ -1233,10 +1241,13 @@ int main()
                   dna_flag);
         input_rna.clear();
         initial_rna.clear();
+        /*
         cout << endl << "Enter any number to continue";
         cin >> pause;
+        */
     }
     r.close();
     w.close();
+    system(CLEAN_FUNC);
 return 0;
 }
