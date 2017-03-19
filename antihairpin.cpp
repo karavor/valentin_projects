@@ -809,28 +809,26 @@ int careful_anti_hairpin(string* input_rna,
     int*** arr = new int**[1];
     int mut_variants_nmb;
     int temp_var;
+    int break_flag = 0;
+
     string new_undef_rna;
     string new_def_rna;
     string best_def_rna;
     string old_best_def_rna = (*old_defined_rna);
     string cmplx;
-    float evaluate_index;
-    float best_evaluate_index;
     float dG;
     float best_dG;
     float old_best_dG = initial_dG;
     float aff;
     float best_aff;
-    float anti_hairpin_index;
-    float lost_aff_index;
 
-    ofstream output_w;
-    output_w.open("./output/careful_antihairpin_stat");
+    //ofstream output_w;
+    //output_w.open("./output/careful_antihairpin_stat");
 
     for(int mutant_ncltd_numb = 1; mutant_ncltd_numb <= ncltds_nmb_in_links_gr; mutant_ncltd_numb++)
     {
         best_aff = 0;
-        best_evaluate_index = 0;
+        best_dG = initial_dG;
         mut_variants_nmb = C_n_k( ncltds_nmb_in_links_gr, mutant_ncltd_numb );
         arr[0] = new int* [mut_variants_nmb];
         for (int i = 0; i < mut_variants_nmb; i++)
@@ -838,7 +836,7 @@ int careful_anti_hairpin(string* input_rna,
 
         comb_maker (arr[0], ncltds_nmb_in_links_gr, mutant_ncltd_numb, mut_variants_nmb);
 
-        output_w << endl << "mutant_ncltd_numb = " << mutant_ncltd_numb << endl << endl;
+        //output_w << endl << "mutant_ncltd_numb = " << mutant_ncltd_numb << endl << endl;
         for (int i = 0; i < mut_variants_nmb; i++)
         {
             new_undef_rna = (*old_undefined_rna);
@@ -850,36 +848,39 @@ int careful_anti_hairpin(string* input_rna,
             design_maker(&target_struct, &new_undef_rna, &new_def_rna);
 
             aff = aff_reader(input_rna, &new_def_rna, dna_flag);
+
             if ( target_aff - aff > target_aff_accuracy )
                 continue;
 
             dG = dG_reader(&new_def_rna);
-            anti_hairpin_index = ( dG - initial_dG ) / abs(initial_dG); //higher is better, it should be > 0
 
-            //cmplx = (*input_rna) + "+" + new_def_rna;
-            //lost_aff_index = ( dG_reader(&cmplx) - initial_cmplx_dG ) / abs(initial_cmplx_dG); //lower is better, it should be > 0
-            lost_aff_index = (100 - aff) / 100;
+            //output_w << '\t' << new_undef_rna << '\t' << aff << '\t' << dG << endl;
 
-            evaluate_index = abs (anti_hairpin_index / lost_aff_index); //higher is better
-
-            output_w << '\t' << new_undef_rna << '\t' << anti_hairpin_index << '\t' << lost_aff_index << '\t' << evaluate_index << '\t' << aff << '\t' << dG << endl;
-
-            if ( evaluate_index > best_evaluate_index )
+            if (dG > best_dG)
             {
-                best_evaluate_index = evaluate_index;
+                //best_evaluate_index = evaluate_index;
                 best_def_rna = new_def_rna;
                 best_aff = aff;
                 best_dG = dG;
+                if ( abs (best_dG - target_hairpin_dG) < target_dG_accuracy )
+                {
+                    break_flag = 1;
+                    break;
+                }
             }
         }
-        output_w << endl << best_def_rna << '\t' << best_dG << '\t' << best_aff << endl;
+        //output_w << endl << best_def_rna << '\t' << best_aff << '\t' << best_dG << endl;
 
-        if ( best_dG < old_best_dG ||
-             best_aff == 0         ||
-             abs (best_dG - target_hairpin_dG) < target_dG_accuracy  )
+        if ( best_dG < old_best_dG || //previous set of mutations gave better result than current
+             best_aff == 0         || //there are no mutations in current set that save required aff level
+             break_flag == 1         )//success
         {
             for (int i = 0; i < mut_variants_nmb; i++)
                 delete [] arr[0][i];
+
+            if (break_flag == 1)
+                old_best_def_rna = best_def_rna;
+
             break;
         }
         old_best_def_rna = best_def_rna;
@@ -890,7 +891,7 @@ int careful_anti_hairpin(string* input_rna,
     }
     (*old_defined_rna) = old_best_def_rna;
 
-    output_w.close();
+    //output_w.close();
     delete [] arr[0];
     delete [] arr;
     return 1;
@@ -1123,9 +1124,6 @@ int anti_hairpin  (string* undefined_rna,
         //*bigstat_w << new_undefined_rna << '\t';
         //*bigstat_w << new_defined_rna << '\t';
 
-        //if (loop_counter == 1 && j == 3)
-            //system (COPY_F);
-
         new_dG = dG_and_struct_reader(&new_defined_rna,
                                       &new_rna_struct,
                                        new_HNL,
@@ -1153,6 +1151,8 @@ int anti_hairpin  (string* undefined_rna,
                          new_HNL[l].second_nucleotide_number_in_link;
         input_w.close();
     }
+    //cout << "ENTER any numb to continue" << endl;
+    //cin >> pause;
     //delete [] new_HNL;
     i = max_arr_elem_numb( mutation_comparison_table, 4 ); //*bigstat_w << endl << "i" << '\t' <<  i << endl;
 
