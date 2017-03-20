@@ -701,7 +701,7 @@ int main()
                                               dna_flag                   ) == 0 );
     stat_w.close();
 
-    float aff_to_target_olig = aff_reader(&best_new_def_rna, &target_rna);
+    float aff_to_target_olig = aff_reader(&best_new_def_rna, &target_rna, dna_flag);
     ofstream result;
     result.open(output_file);
     result << best_new_def_rna << endl
@@ -714,7 +714,7 @@ int main()
     float aff_to_olig_from_group;
     for (int i = 0; i < oligs_nmb; i++)
     {
-        aff_to_olig_from_group = aff_reader(&best_new_def_rna, &(AAO_table[i].seq));
+        aff_to_olig_from_group = aff_reader(&best_new_def_rna, &(AAO_table[i].seq), dna_flag);
         result << (i + 1) << ") " << aff_to_olig_from_group;
 
         if (aff_to_olig_from_group < AAO_table[i].aff_min_level)

@@ -21,6 +21,7 @@ const int GEN_EMPTY = 2; //ok, print EMPTY SET and continue
 const int GEN_ERROR = 3;
 
 const int max_loop_repetition = 10;
+int pause;
 
 #define MFE_FUNC "\
     #/bin/bash \n\
@@ -443,6 +444,10 @@ int max_overlap_pstns_aff_to_gr_rdcr (string* best_new_def_rna,
     int break_flag = 0;
     string new_def_rna;
     string old_best_def_rna = (*input_rna);
+/*
+cout << "max_overlap_positions_nmb = " << max_overlap_positions_nmb << endl;
+cin >> pause;
+*/
     for(int mutant_ncltd_numb = 1; mutant_ncltd_numb < max_overlap_positions_nmb; mutant_ncltd_numb++)
     {
         max_evaluate_index = 0;
@@ -490,6 +495,10 @@ int max_overlap_pstns_aff_to_gr_rdcr (string* best_new_def_rna,
             {
                 break_flag = 1;
                 (*best_new_def_rna) = new_def_rna;
+                //(*stat_w) << undefined_rna << ' ' << lost_aff_index << ' ' << antiaff_index << ' ' << evaluate_index << endl << new_def_rna << endl;
+                //best_antiaff_index = antiaff_index;
+                //best_antiaff_index_update_flag = 1;
+                //max_evaluate_index = 99999;
                 break; //we consider this variant as good
             }
 
@@ -518,6 +527,7 @@ int max_overlap_pstns_aff_to_gr_rdcr (string* best_new_def_rna,
         //(*stat_w) << endl << best_antiaff_index << endl << max_evaluate_index << endl << endl;
         if (break_flag)
         {
+            //(*stat_w) << "break_flag = " << break_flag << endl;
             for (int i = 0; i < mut_variants_nmb; i++)
                 delete [] arr[0][i];
             break;
@@ -525,6 +535,10 @@ int max_overlap_pstns_aff_to_gr_rdcr (string* best_new_def_rna,
         if ( (old_best_antiaff_index < best_antiaff_index) ||
              (best_antiaff_index_update_flag == 0)           )
         {
+            /*(*stat_w) << "old_best_antiaff_index = " << old_best_antiaff_index << endl
+                      << "best_antiaff_index = " << best_antiaff_index << endl
+                      << "best_antiaff_index_update_flag = " << best_antiaff_index_update_flag << endl;
+            */
             for (int i = 0; i < mut_variants_nmb; i++)
                 delete [] arr[0][i];
             (*best_new_def_rna) = old_best_def_rna;
@@ -692,9 +706,9 @@ int main()
                                               &target_struct,
                                               &stat_w,
                                               dna_flag                   ) == 0 );
-    stat_w.close();
+    //stat_w.close();
 
-    float aff_to_target_olig = aff_reader(&best_new_def_rna, &target_rna);
+    float aff_to_target_olig = aff_reader(&best_new_def_rna, &target_rna, dna_flag);
     ofstream result;
     result.open(output_file);
     result << best_new_def_rna << endl
@@ -707,7 +721,7 @@ int main()
     float aff_to_olig_from_group;
     for (int i = 0; i < oligs_nmb; i++)
     {
-        aff_to_olig_from_group = aff_reader(&best_new_def_rna, &(AAO_table[i].seq));
+        aff_to_olig_from_group = aff_reader(&best_new_def_rna, &(AAO_table[i].seq), dna_flag);
         result << (i + 1) << ") " << aff_to_olig_from_group;
 
         if (aff_to_olig_from_group < aff_min_level)
