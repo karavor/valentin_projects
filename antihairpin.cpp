@@ -105,7 +105,7 @@ float exp_numb_reader(string* s)
     return first_part_of_numb * pow(10, (int)(minus_flag * second_part_of_numb) );
 }
 
-int c_seq_maker (string* seq, string* c_seq, int dna_flag = 0)
+int c_seq_maker (string* seq, string* c_seq, int dna_flag)
 {
     int l = (*seq).length();
     for (int i = 0; i < l; i++ )
@@ -333,21 +333,46 @@ float aff_reader (string* seq_1, string* seq_2, int dna_flag = 0)
 
 void design_maker (string* target_struct, //read
                    string* undefined_rna, //read
-                   string* defined_rna   )//write
+                   string* defined_rna,   //write
+                   int     dna_flag     )
 {
+    string undef_dna = (*undefined_rna);
+    int l = undef_dna.length();
+
+    if (dna_flag == 1)
+    {
+        for (int i = 0; i < l; i++)
+        {
+            if (undef_dna[i] == 'T')
+                undef_dna[i]  = 'U';
+        }
+    }
+
     ofstream input_w;
     input_w.open(input_design);
     input_w << *target_struct << endl;
-    input_w << *undefined_rna;
+    input_w << undef_dna;
     input_w.close();
 
     system (DESIGN_FUNC);
 
+    string defined_dna;
+
     ifstream output_r;
     output_r.open(output_design);
-    do    {getline(output_r, *defined_rna);}
-    while ( (*defined_rna)[0] == '%' );
+    do    {getline(output_r, defined_dna);}
+    while ( defined_dna[0] == '%' );
     output_r.close();
+
+    if (dna_flag == 1)
+    {
+        for (int i = 0; i < l; i++)
+        {
+            if (defined_dna[i] == 'U')
+                defined_dna[i]  = 'T';
+        }
+    }
+    (*defined_rna) = defined_dna;
 }
 
 int aff_reducer_1(string* input_rna,      //it's like simple total antihairpin (additional)
@@ -368,7 +393,8 @@ int aff_reducer_1(string* input_rna,      //it's like simple total antihairpin (
         else (*undefined_rna)[HNL[i].first_nucleotide_number_in_link - 1] = 'N';
         design_maker(target_struct,
                      undefined_rna,
-                     new_defined_rna);
+                     new_defined_rna,
+                     dna_flag);
         *new_aff = aff_reader (input_rna, new_defined_rna, dna_flag);
         if ( aff - *new_aff > absolute_aff_changing ) // aff started change significantly
         {
@@ -432,7 +458,8 @@ int aff_reducer_2(string* input_rna,
             (*undefined_rna)[i] = except_ncltd_symb ((*undefined_rna)[i]);
             design_maker(target_struct,
                          undefined_rna,
-                         new_defined_rna);
+                         new_defined_rna,
+                         dna_flag);
             *new_aff = aff_reader (input_rna, new_defined_rna, dna_flag);
             if ( aff - *new_aff > absolute_aff_changing ) // aff started change significantly
             {
@@ -638,7 +665,7 @@ int careful_aff_reducer( string* complex_struct,
                 temp_var = ncltds_in_cmplx_nmbs[ arr[0][i][j] ];
                 (*undefined_rna)[temp_var] = except_ncltd_symb ((*undefined_rna)[temp_var]);
             }
-            design_maker(target_struct, undefined_rna, &new_def_rna);
+            design_maker(target_struct, undefined_rna, &new_def_rna, dna_flag);
             d_aff = aff_reader(input_rna, &new_def_rna, dna_flag)  - target_aff;
 
             if ( abs(d_aff) < abs(min_d_aff) )
@@ -845,7 +872,7 @@ int careful_anti_hairpin(string* input_rna,
                 temp_var = ncltds_nmbs_in_links_gr[ arr[0][i][j] ];
                 new_undef_rna[temp_var] = 'N';
             }
-            design_maker(&target_struct, &new_undef_rna, &new_def_rna);
+            design_maker(&target_struct, &new_undef_rna, &new_def_rna, dna_flag);
 
             aff = aff_reader(input_rna, &new_def_rna, dna_flag);
 
@@ -1120,7 +1147,8 @@ int anti_hairpin  (string* undefined_rna,
 
         design_maker (target_struct,
                       &new_undefined_rna,
-                      &new_defined_rna   );
+                      &new_defined_rna,
+                      dna_flag   );
         //*bigstat_w << new_undefined_rna << '\t';
         //*bigstat_w << new_defined_rna << '\t';
 
@@ -1439,9 +1467,10 @@ void input_rna_reader(string*   input_str,
     float temp_var;
     string_before_separator_reader (input_str, &temp_string, sep, i);
     decimal_numb_reader( &temp_string, 0, &temp_var);
+    (*dna_flag) = (int) temp_var;
 }
 
-void initial_rna_maker(string* input_rna, string* c_input_rna, int dna_flag = 0)
+void initial_rna_maker(string* input_rna, string* c_input_rna, int dna_flag)
 {
     c_seq_maker( input_rna, c_input_rna, dna_flag );
     string_inverser( c_input_rna );
