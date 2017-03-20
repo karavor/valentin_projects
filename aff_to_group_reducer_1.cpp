@@ -62,6 +62,7 @@ struct anti_aff_olig
     string seq;
     string cmplx_struct_part;
     float aff;
+    float aff_min_level;
 };
 
 void string_inverser (string* s)
@@ -410,7 +411,6 @@ void target_olig_structure_part_in_complex_reader (string* new_defined_rna,
 
 int max_overlap_pstns_aff_to_gr_rdcr (string* best_new_def_rna,
                                       int     oligs_nmb,
-                                      float   aff_min_level,
                                       float   min_aff_to_target_olig,
                                       string* target_rna,
                                       string* input_rna,
@@ -477,7 +477,7 @@ int max_overlap_pstns_aff_to_gr_rdcr (string* best_new_def_rna,
             for (int j = 0; j < oligs_nmb; j++)
             {
                 aff = aff_reader(&new_def_rna, &(AAO_table[j].seq), dna_flag);
-                if (aff > aff_min_level)
+                if (aff > AAO_table[j].aff_min_level)
                 {
                     antiaff_index += aff; //lower is better
                     //big_aff_oligs_nmb++;
@@ -543,7 +543,6 @@ int max_overlap_pstns_aff_to_gr_rdcr (string* best_new_def_rna,
 }
 
 void data_to_gr_reader_and_max_overlap_counter (int     oligs_nmb,
-                                                float   aff_min_level,
                                                 string* input_rna,
                                                 int     rna_length,
                                                 anti_aff_olig* AAO_table,
@@ -570,8 +569,8 @@ void data_to_gr_reader_and_max_overlap_counter (int     oligs_nmb,
         overlap_counter = 0;
         for (int i = 0; i < oligs_nmb; i++)
         {
-            if (AAO_table[i].aff > aff_min_level        &&
-                AAO_table[i].cmplx_struct_part[j] == ')'  )
+            if (AAO_table[i].aff > AAO_table[i].aff_min_level  &&
+                AAO_table[i].cmplx_struct_part[j] == ')'         )
             {
                 overlap_counter++;
             }
@@ -628,19 +627,29 @@ int main()
     getline(inp_r, temp_str);
     decimal_numb_reader(&temp_str, (int)temp_str.find(' ') + 1, &temp_fl);
     int oligs_nmb = (int)temp_fl;
+/*
+    int pse;
+    cout << "enter any numb to continue" << endl;
+    cin >> pse;
 
     float aff_min_level;
     getline(inp_r, temp_str);
     decimal_numb_reader(&temp_str, (int)temp_str.find(' ') + 1, &aff_min_level);
-
-    int rna_length = input_rna.length();//
+*/
     anti_aff_olig AAO_table [oligs_nmb];//
 
     for (int i = 0; i < oligs_nmb; i++)
+    {
         getline(inp_r, AAO_table[i].seq);
-
+        decimal_numb_reader(&(AAO_table[i].seq),
+                            (int)(AAO_table[i].seq).find(' ') + 1,
+                            &(AAO_table[i].aff_min_level)         );
+        (AAO_table[i].seq).erase((AAO_table[i].seq).begin() + (AAO_table[i].seq).find(' '),
+                                 (AAO_table[i].seq).end()                                  );
+    }
     inp_r.close();
 
+    int rna_length = input_rna.length();//
     int max_overlap_positions [rna_length];//+
     int max_overlap_positions_nmb = 0;//+
 
@@ -665,7 +674,6 @@ int main()
         }
         */
         data_to_gr_reader_and_max_overlap_counter (oligs_nmb,
-                                                   aff_min_level,
                                                    &best_new_def_rna,
                                                    rna_length,
                                                    AAO_table,
@@ -681,7 +689,6 @@ int main()
     }
     while ( max_overlap_pstns_aff_to_gr_rdcr (&best_new_def_rna,
                                               oligs_nmb,
-                                              aff_min_level,
                                               min_aff_to_target_olig,
                                               &target_rna,
                                               &input_rna,
@@ -710,7 +717,7 @@ int main()
         aff_to_olig_from_group = aff_reader(&best_new_def_rna, &(AAO_table[i].seq));
         result << (i + 1) << ") " << aff_to_olig_from_group;
 
-        if (aff_to_olig_from_group < aff_min_level)
+        if (aff_to_olig_from_group < AAO_table[i].aff_min_level)
              result << " +" << endl;
         else result << " -" << endl;
     }
