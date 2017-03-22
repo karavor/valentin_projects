@@ -547,6 +547,7 @@ float cmplx_dG_reducer(float   target_cmplx_dG,
 {
     string cmplx = (*input_rna) + "+" + (*defined_rna);
     string new_cmplx;
+    string best_new_cmplx;
 
     float new_cmplx_dG;
     float best_cmplx_dG;
@@ -574,6 +575,7 @@ float cmplx_dG_reducer(float   target_cmplx_dG,
             {
                 min_diff_cmplx_dG = diff_cmplx_dG;
                 best_cmplx_dG = new_cmplx_dG;
+                best_new_cmplx = new_cmplx;
             }
         }
         if (min_diff_cmplx_dG <= target_cmplx_dG_accuracy ||
@@ -582,8 +584,9 @@ float cmplx_dG_reducer(float   target_cmplx_dG,
             break;
         }
     }
-    new_cmplx.erase( new_cmplx.begin(), new_cmplx.begin() + inp_rna_length + 1);
-    (*defined_rna) = new_cmplx;
+    best_new_cmplx.erase( best_new_cmplx.begin(), best_new_cmplx.begin() + inp_rna_length + 1);
+
+    (*defined_rna) = best_new_cmplx;
     return best_cmplx_dG;
 }
 
@@ -795,7 +798,7 @@ int end_program_check (float     dG,
         if ( target_cmplx_dG - cmplx_dG > target_cmplx_dG_accuracy )
         {
             undefined_rna = (*defined_rna);
-
+/*
             cmplx_dG_reducer_1(input_rna,
                                      defined_rna,
                                      &undefined_rna,
@@ -805,7 +808,7 @@ int end_program_check (float     dG,
                                      new_HNL,
                                      dna_flag);
 
-            cmplx = (*input_rna) + "+" + (*defined_rna);
+            cmplx = (*input_rna) + "+" + (*defined_rna);*/
             new_cmplx_dG = dG_reader(&cmplx);
             if ( target_cmplx_dG - new_cmplx_dG > target_cmplx_dG_accuracy )
             {
