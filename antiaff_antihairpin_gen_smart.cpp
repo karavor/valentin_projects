@@ -163,7 +163,7 @@ float aff_reader (string* seq_1, string* seq_2, int dna_flag = 0)
     return 1.0e8 * (float)exp_numb_reader(&aff_str);
 }
 
-float dG_and_struct_reader (string* seq, string* seq_struct)
+float dG_reader (string* seq)
 {
     ofstream w;
     w.open(input_mfe);
@@ -181,7 +181,6 @@ float dG_and_struct_reader (string* seq, string* seq_struct)
     while (temporal_str[0] != '-' &&
            temporal_str[0] != '0'    );
 
-    getline( r, (*seq_struct) );
     r.close();
 
     return decimal_numb_reader( &temporal_str );
@@ -336,13 +335,13 @@ void input_data_reader (int* dna_flag,
     read.close();
 }
 
-bool string_in_base_finder (string*         str,
+int  string_in_base_finder (string*         str,
                             vector<string>* string_base)
 {
     for (int i = 0; i < (int)(*string_base).size(); i++)
     {
         if ( (*str) == (*string_base)[i] )
-            return 1;
+            return (i + 1);
     }
     return 0;
 }
@@ -520,12 +519,19 @@ bool rndm_int_without_repeat_generator (vector<int>* int_vect,
     return 0;
 }
 
+struct ok_pattern_in_the_position
+{
+    string pattern;
+    int position;
+};
+
 bool initial_olig_maker (int dna_flag,
                          int olig_length,
                          int pattern_length,
                          string* initial_olig,
                          vector<string>* allowed_pattern_base,
-                         vector<string>* prevent_pattern_base )
+                         vector<string>* prevent_pattern_base,
+                         vector<ok_pattern_in_the_position>* ok_pattern_base)
 {
     int patterns_nmb = 1 + (int)(olig_length/pattern_length);
     vector<int> rndm_int_vect (0);
@@ -539,10 +545,16 @@ bool initial_olig_maker (int dna_flag,
         cout << endl << "There are too few patterns in allowed_pattern_base" << endl;
         return 1;
     }
+    ok_pattern_in_the_position ok_pattern_in_the_position_one;
 
     for (int i = 0; i < patterns_nmb; i++)
     {
         building_olig = (*allowed_pattern_base)[ rndm_int_vect[i] ];
+
+        ok_pattern_in_the_position_one.pattern = building_olig;
+        ok_pattern_in_the_position_one.position = i * pattern_length;
+        (*ok_pattern_base).push_back(ok_pattern_in_the_position_one);
+
         (*initial_olig) += building_olig;
 
         (*allowed_pattern_base).erase( (*allowed_pattern_base).begin() + rndm_int_vect[i] );
@@ -552,7 +564,7 @@ bool initial_olig_maker (int dna_flag,
                                  allowed_pattern_base,
                                  prevent_pattern_base );
 
-        //(*prevent_pattern_base).push_back( building_olig ); //This may lead to definite areas become more specific
+        (*prevent_pattern_base).push_back( building_olig );
     }
     if ((*initial_olig).length() > olig_length)
         (*initial_olig).erase( (*initial_olig).begin() + olig_length, (*initial_olig).end() );
@@ -578,10 +590,24 @@ void current_pattern_base_maker (int olig_length,
     }
 }
 
+bool ok_pattern_test (int pstn,
+                      string* ptrn,
+                      vector<ok_pattern_in_the_position>* ok_pattern_base)
+{
+    for (int i = 0; i < (int)(*ok_pattern_base).size(); i++)
+    {
+        if ( ( ( (*ok_pattern_base)[i]).pattern == (*ptrn) ) &&
+             ( ( (*ok_pattern_base)[i]).position == pstn )     )
+            return 1;
+    }
+    return 0;
+}
+
 void current_pattern_base_corrector (int dna_flag,
                                      vector<string>* prevent_pattern_base,
                                      vector<string>* allowed_pattern_base,
-                                     vector<string>* current_pattern_base )
+                                     vector<string>* current_pattern_base,
+                                     vector<ok_pattern_in_the_position>* ok_pattern_base )
 {
     int pattern_length = ( (*prevent_pattern_base)[0] ).length();
     int prevent_neighbour_patterns_nmb;
@@ -589,11 +615,15 @@ void current_pattern_base_corrector (int dna_flag,
     int new_patterns_group_size = 2*( pattern_length - 1 ) + 1;
     string best_new_patterns [new_patterns_group_size];
     bool break_flag;
+    ok_pattern_in_the_position ok_pattern_in_the_position_one;
 
     for (int i = 0; i < (int)(*current_pattern_base).size(); i++)
     {
-        if ( string_in_base_finder(&((*current_pattern_base)[i]),
-                                   prevent_pattern_base      ) )
+
+        if ( ( string_in_base_finder( &((*current_pattern_base)[i]),
+                                      prevent_pattern_base          ) != 0 )
+            &&
+              ( ok_pattern_test(i, &( (*current_pattern_base)[i] ), ok_pattern_base) == 0 ) )
         {
             break_flag = 0;
             min_prevent_neighbour_patterns_nmb = 2 * (int)(*current_pattern_base).size();
@@ -611,9 +641,13 @@ void current_pattern_base_corrector (int dna_flag,
                         {
                             (*current_pattern_base)[i - k][k + l] = (*allowed_pattern_base)[j][l];
                         }
-                        if ( string_in_base_finder(&((*current_pattern_base)[i - k]),
-                                                   prevent_pattern_base)             )
+                        if ( ( string_in_base_finder( &((*current_pattern_base)[i - k]),
+                                                      prevent_pattern_base              ) != 0 )
+                              &&
+                              ( ok_pattern_test(i - k, &( (*current_pattern_base)[i - k] ), ok_pattern_base) == 0 ) )
+                        {
                             prevent_neighbour_patterns_nmb++;
+                        }
                     }
                     if (i + k < (int)(*current_pattern_base).size())
                     {
@@ -622,9 +656,13 @@ void current_pattern_base_corrector (int dna_flag,
                             (*current_pattern_base)[i + k][pattern_length - 1 - k - l] =
                             (*allowed_pattern_base)[j][pattern_length - 1 - l];
                         }
-                        if ( string_in_base_finder(&((*current_pattern_base)[i + k]),
-                                                   prevent_pattern_base)             )
+                        if ( ( string_in_base_finder( &((*current_pattern_base)[i + k]),
+                                                      prevent_pattern_base              ) != 0 )
+                              &&
+                              ( ok_pattern_test(i + k, &( (*current_pattern_base)[i + k] ), ok_pattern_base) == 0 ) )
+                        {
                             prevent_neighbour_patterns_nmb++;
+                        }
                     }
                 }
                 if (prevent_neighbour_patterns_nmb < min_prevent_neighbour_patterns_nmb)
@@ -659,6 +697,10 @@ void current_pattern_base_corrector (int dna_flag,
             complement_pair_deleter ( dna_flag, &( (*current_pattern_base)[i] ), allowed_pattern_base, prevent_pattern_base );
             vector_element_deleter<string> (    &( (*current_pattern_base)[i] ), allowed_pattern_base );
             (*prevent_pattern_base).push_back( (*current_pattern_base)[i] ); //This may lead to definite areas become more specific
+
+            ok_pattern_in_the_position_one.pattern = (*current_pattern_base)[i];
+            ok_pattern_in_the_position_one.position = i;
+            (*ok_pattern_base).push_back(ok_pattern_in_the_position_one);
         }
     }
 }
@@ -708,6 +750,8 @@ int main()
 
     ofstream error_flag;
 
+    vector<ok_pattern_in_the_position> ok_pattern_base(0);
+
     if (initial_olig.length() == 0)
     {
         if ( initial_olig_maker (dna_flag,
@@ -715,7 +759,8 @@ int main()
                                  pattern_length,
                                  &initial_olig,
                                  &allowed_pattern_base,
-                                 &prevent_pattern_base ) )
+                                 &prevent_pattern_base,
+                                 &ok_pattern_base ) )
         {
 
             error_flag.open("./error_flag");
@@ -734,7 +779,8 @@ int main()
     current_pattern_base_corrector (dna_flag,
                                     &prevent_pattern_base,
                                     &allowed_pattern_base,
-                                    &current_pattern_base );
+                                    &current_pattern_base,
+                                    &ok_pattern_base );
 
     ofstream write;
     write.open(statistic);
@@ -757,72 +803,44 @@ int main()
     string result;
     current_patterns_integrator(&result, &current_pattern_base);
 
-    string c_result;
-    c_seq_maker(&result, &c_result, dna_flag);
+    string result_1;
+    for (int i = 0; i < (int)(result.length() / 2); i++)
+        result_1.push_back( result[i] );
 
-    string result_struct;
-    float dG = dG_and_struct_reader(&result, &result_struct);
+    string result_2;
+    for (int i = result_1.length(); i < result.length(); i++)
+        result_2.push_back( result[i] );
 
-    string c_result_struct;
-    float c_dG = dG_and_struct_reader(&c_result, &c_result_struct);
+    string c_result_1;
+    c_seq_maker(&result_1, &c_result_1, dna_flag);
+
+    string c_result_2;
+    c_seq_maker(&result_2, &c_result_2, dna_flag);
+
+    string cmplx_1 = result_1 + "+" + c_result_1;
+    string cmplx_2 = result_2 + "+" + c_result_2;
 
     write.open(output_file);
-    write << c_dG + dG << endl;
-    write << result << endl
-          << result_struct << endl
-          << "dG = " << dG << " kkal/mol" << endl << endl;
+    write << "dG: " << dG_reader(&result) << endl
+          << "dG_c1: " << dG_reader(&c_result_1) << endl
+          << "dG_c2: " << dG_reader(&c_result_2) << endl
+          << "dG_cmplx_1: " << dG_reader(&cmplx_1) << endl
+          << "dG_cmplx_2: " << dG_reader(&cmplx_2) << endl
+          << "aff_c1_to_2: " << aff_reader(&c_result_1, &result_2, dna_flag) << endl
+          << "aff_2_to_c1: " << aff_reader(&c_result_2, &result_1, dna_flag) << endl;
 
-    write << "Aff to oligs, %: " << endl;
-
-    vector<float> aff_vect (0);
-
-    aff_vect.push_back( aff_reader(&result, &result, dna_flag) );
-    write << "0) " << aff_vect[0] << endl;
+    write << "0) " << aff_reader(&result, &result, dna_flag) << endl;
 
     for (int i = 1; i <= oligs_nmb; i++)
     {
-        aff_vect.push_back( aff_reader(&result, &(oligs_group[i - 1]), dna_flag) );
-        write << i << ") " << aff_vect [i] << endl;
+        write << i << ") " << aff_reader(&result, &(oligs_group[i - 1]), dna_flag) << endl;
     }
 
-    write << endl << "for complement olig: " << endl
-                  << c_result << endl
-                  << c_result_struct << endl
-                  << "dG = " << c_dG << " kkal/mol" << endl << endl;
-
-    write << "Aff to oligs, %: " << endl;
-
-    aff_vect.push_back( aff_reader(&c_result, &c_result, dna_flag) );
-    write << "0) " << aff_vect[oligs_nmb + 1] << endl;
-
-    for (int i = 1; i <= oligs_nmb; i++)
-    {
-        aff_vect.push_back( aff_reader(&c_result, &(oligs_group[i - 1]), dna_flag) );
-        write << i << ") " << aff_vect[oligs_nmb + 1 + i] << endl;
-    }
-
-    write << endl << "rndm_seed: " << rndm_seed << endl;
-
-    int break_flag = 0;
-
-    for (int i = 0; i < (int)aff_vect.size(); i++)
-    {
-        if ( aff_vect[i] > max_aff_level )
-        {
-            write << "!-";
-            break_flag = 1;
-            break;
-        }
-    }
-    if (break_flag == 0)
-        write << "!+";
+    write << '$' << result << endl;
+    write << "rndm_seed: " << rndm_seed;
 
     write.close();
     system(CLEAN_FUNC);
-
-    error_flag.open("./error_flag");
-    error_flag << 0;
-    error_flag.close();
 
     return 0;
 }

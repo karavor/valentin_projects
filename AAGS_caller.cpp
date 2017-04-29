@@ -68,58 +68,130 @@ float decimal_numb_reader( string* s )
     return (float) minus_flag * ( (float)int_numb_reader(&int_part) + (float)int_numb_reader(s) / (float)int_pow (10, (*s).length() ) );
 }
 
+void string_with_prmtr_reader(ifstream* read, float* prmtr)
+{
+    string read_str;
+    getline( (*read), read_str);
+    read_str.erase( read_str.begin(), read_str.begin() + read_str.find( ' ' ) + 1 );
+    *prmtr = decimal_numb_reader(&read_str);
+}
 
 main()
 {
     ofstream write;
     write.open(AAGS_caller_stat);
 
-    ifstream read;
+    float crit_dG,
+          crit_c_dG,
+          crit_cmplx_dG,
+          crit_cross_aff,
+          crit_c_cross_aff,
+          reading_prmtr;
+
     string read_str;
 
-    float dG, max_dG = -10000;
-    string best_variant;
-    string variant;
+    ifstream read;
+    read.open("./critical_prmtrs");
+
+    string_with_prmtr_reader(&read, &crit_dG);
+    string_with_prmtr_reader(&read, &crit_c_dG);
+    string_with_prmtr_reader(&read, &crit_cmplx_dG);
+    string_with_prmtr_reader(&read, &crit_cross_aff);
+    string_with_prmtr_reader(&read, &crit_c_cross_aff);
+
+    read.close();
+
+    int continue_flag;
+    int pause;
 
     for (int i = 0; i < max_loop_size; i++)
     {
+        continue_flag = 0;
+
         system(AAGS_CALLER);
-
-        read.open("./error_flag");
-        getline(read, read_str);
-        read.close();
-
-        if ( read_str[0] == '1' )
-            continue;
 
         read.open(AAGS_output);
 
-        getline(read, read_str);
-        write << read_str << endl;
+        string_with_prmtr_reader(&read, &reading_prmtr);
+        if( reading_prmtr < crit_dG )
+        {
+            read.close();
+            continue;
+        }
 
-        dG = decimal_numb_reader(&read_str);
+        string_with_prmtr_reader(&read, &reading_prmtr);
+        if( reading_prmtr < crit_c_dG )
+        {
+            read.close();
+            continue;
+        }
 
-        getline(read, read_str);
-        write << read_str << endl;
+        string_with_prmtr_reader(&read, &reading_prmtr);
+        if( reading_prmtr < crit_c_dG )
+        {
+            read.close();
+            continue;
+        }
 
-        variant = read_str;
+        string_with_prmtr_reader(&read, &reading_prmtr);
+        if( reading_prmtr > crit_cmplx_dG )
+        {
+            read.close();
+            continue;
+        }
 
-        do
+        string_with_prmtr_reader(&read, &reading_prmtr);
+        if( reading_prmtr > crit_cmplx_dG )
+        {
+            read.close();
+            continue;
+        }
+
+        string_with_prmtr_reader(&read, &reading_prmtr);
+        if( reading_prmtr > crit_c_cross_aff )
+        {
+            read.close();
+            continue;
+        }
+
+        string_with_prmtr_reader(&read, &reading_prmtr);
+        if( reading_prmtr > crit_c_cross_aff )
+        {
+            read.close();
+            continue;
+        }
+
+        while (1)
         {
             getline(read, read_str);
-            write << read_str << endl;
-        }
-        while (read_str[0] != '!');
+            if (read_str[0] == '$')
+                break;
 
-        if ( dG > max_dG && read_str[1] == '+' )
+            read_str.erase( read_str.begin(), read_str.begin() + read_str.find( ' ' ) + 1 );
+            reading_prmtr = decimal_numb_reader(&read_str);
+
+            if( reading_prmtr > crit_cross_aff )
+            {
+                continue_flag = 1;
+                break;
+            }
+        }
+
+        if(continue_flag)
         {
-            max_dG = dG;
-            best_variant = variant;
+            read.close();
+            continue;
         }
 
+        read_str.erase(read_str.begin());
+        write << read_str << ' ';
+
+        getline(read, read_str);
+        read_str.erase( read_str.begin(), read_str.begin() + read_str.find( ' ' ) + 1 );
+
+        write << read_str << endl;
         read.close();
     }
-    write << endl << endl << "best_variant: " << best_variant;
     write.close();
     return 0;
 }
