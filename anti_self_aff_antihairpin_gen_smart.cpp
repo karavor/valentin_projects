@@ -4,6 +4,7 @@
 #include <string>
 #include <cmath>
 #include <vector>
+#include <iomanip>
 
 using namespace std;
 const char* AAGS_input_file    = "./input/AAGS_input"; // text file input should exist
@@ -261,7 +262,7 @@ int  string_in_base_finder (string* pttrn,
         if ( (*pttrn) == ((*pttrn_base)[i]).pttrn )
             return i;
     }
-    cout << endl << "There's no such pattern in base" << endl;
+    //cout << endl << "There's no such pattern in base" << endl;
     return -1;
 }
 
@@ -270,8 +271,11 @@ bool appeared_pttrns_of_gluing_nmbs (vector<pttrn_with_self_dG_score>* pttrn_bas
                                      int i,
                                      int j)
 {
+    ( (*gluing_matrix_element).appeared_pttrns_nmbs ).push_back( i );
+    ( (*gluing_matrix_element).appeared_pttrns_nmbs ).push_back( j );
+
     string appeared_pttrn;
-    string gluing = ( ((*pttrn_base)[i]).pttrn ) + ( ((*pttrn_base)[k]).pttrn );
+    string gluing = ( ((*pttrn_base)[i]).pttrn ) + ( ((*pttrn_base)[j]).pttrn );
     gluing.erase( gluing.begin() );
     gluing.erase( gluing.begin() + gluing.length() - 1 );
 
@@ -289,7 +293,10 @@ bool appeared_pttrns_of_gluing_nmbs (vector<pttrn_with_self_dG_score>* pttrn_bas
         if (appeared_pttrn_nmb < 0)
         {
             (*gluing_matrix_element).gluing_dG_score = 1;//this score we shouldn't change lower
-            return 0;
+            //return 0; // it will be more rationally, but now it's not convenient for analyzing
+            ( (*gluing_matrix_element).appeared_pttrns_nmbs ).push_back( -1 );
+            appeared_pttrn.clear();
+            continue;
         }
         ( (*gluing_matrix_element).appeared_pttrns_nmbs ).push_back( appeared_pttrn_nmb );
         appeared_pttrn.clear();
@@ -333,22 +340,162 @@ void gluing_matrix_maker (vector<pttrn_with_self_dG_score>* pttrn_base,
     }
 }
 
-void C_n_k_generator (vector<int>* )
+template<class _T_>
+
+bool C_n_k_generator (vector<_T_>* elements_arr,
+                      vector< vector<_T_> >* result_arr,
+                      int k)
 {
-    s
+    int n = (*elements_arr).size();
+
+    if (n < k)
+        return 1;
+
+    vector<_T_> current_res;
+
+    for (int j = 0; j <= n - k; j++)
+    {
+        for (int l = j; l < j + k; l++)
+            current_res.push_back( (*elements_arr)[l] );
+
+        (*result_arr).push_back(current_res);
+
+        for (int i = j + k; i < n; i++)
+        {
+            current_res.erase(current_res.begin() + k - 1);
+            current_res.push_back( (*elements_arr)[i] );
+            (*result_arr).push_back(current_res);
+        }
+        current_res.clear();
+    }
+    return 0;
 }
 
 bool gluing_dG_score_calc (vector< vector<two_pttrn_gluing> >* gluing_matrix)
 {
+    vector< vector<int> > C_n_k_arr;
+    float max_cmplx_dG_score;
+    float current_cmplx_dG_score;
+
     for (int i = 0; i < (*gluing_matrix).size(); i++) // string in gluing_matrix
     {
         for (int j = 0; j < (*gluing_matrix).size(); j++) //column in gluing_matrix
         {
             if ( ((*gluing_matrix)[i][j]).gluing_dG_score == 0 )
             {
-                s
+                if ( C_n_k_generator<int> (&( ((*gluing_matrix)[i][j]).appeared_pttrns_nmbs ),
+                                           &C_n_k_arr,
+                                           2                                                  ) )
+                {
+                    cout << endl << "C_n_k_generator fail: n < k" << endl;
+                    return 1;
+                }
+                max_cmplx_dG_score = 0;
+
+                for (int l = 0; l < C_n_k_arr.size(); l++)
+                {
+                    current_cmplx_dG_score = ((*gluing_matrix)[ C_n_k_arr[l][0] ]
+                                                              [ C_n_k_arr[l][1] ]).cmplx_dG_score;
+
+                    if ( current_cmplx_dG_score > max_cmplx_dG_score )
+                    {
+                        max_cmplx_dG_score = current_cmplx_dG_score;
+                    }
+                }
+                ((*gluing_matrix)[i][j]).gluing_dG_score = max_cmplx_dG_score;
             }
         }
+    }
+    return 0;
+}
+
+void cmplx_dG_score_string_writer (char sep,
+                                   ofstream* write,
+                                   vector<two_pttrn_gluing>* gluing_matrix_str)
+{
+    (*write) << sep;
+
+    for (int i = 0; i < (*gluing_matrix_str).size(); i++)
+    {
+        (*write) << sep << ( (*gluing_matrix_str)[i] ).cmplx_dG_score;
+    }
+    (*write) << endl;
+}
+
+void appeared_pttrns_string_writer (char sep,
+                                    string* str_pttrn,
+                                    ofstream* write,
+                                    vector<two_pttrn_gluing>* gluing_matrix_str,
+                                    vector<pttrn_with_self_dG_score>* pttrn_base)
+{
+    int current_pttrn_nmb;
+    int pttrn_length = ( ( (*pttrn_base)[0] ).pttrn ).length();
+
+    for (int k = 0; k < pttrn_length - 1; k++)
+    {
+        if (k == (int)( (pttrn_length - 1) / 2))
+            (*write) << (*str_pttrn);
+        else
+            (*write) << sep;
+
+        for (int i = 0; i < (*gluing_matrix_str).size(); i++)
+        {
+            (*write) << sep;
+            current_pttrn_nmb = ( ((*gluing_matrix_str)[i]).appeared_pttrns_nmbs )[k + 2];
+
+            if ( current_pttrn_nmb >= 0 )
+                (*write) << ( (*pttrn_base)[ current_pttrn_nmb ] ).pttrn;
+            else
+                (*write) << '-' << sep;
+        }
+        (*write) << endl;
+    }
+}
+
+void gluing_dG_score_string_writer (char sep,
+                                    ofstream* write,
+                                    vector<two_pttrn_gluing>* gluing_matrix_str)
+{
+    (*write) << sep;
+
+    for (int i = 0; i < (*gluing_matrix_str).size(); i++)
+    {
+        (*write) << sep << ( (*gluing_matrix_str)[i] ).gluing_dG_score;
+    }
+    (*write) << endl << endl;
+}
+
+void gluing_matrix_writer( ofstream* write,
+                           vector< vector<two_pttrn_gluing> >* gluing_matrix,
+                           vector<pttrn_with_self_dG_score>* pttrn_base      )
+{
+    int n = (*gluing_matrix).size();
+    char sep = '\t';
+
+    (*write) << fixed << setprecision(2);
+    (*write) << sep << (int)2;
+
+    for (int i = 0; i < n; i++)
+    {
+        (*write) << sep << ( (*pttrn_base)[i] ).pttrn;
+    }
+    (*write) << endl << endl << (int)1;
+
+    for (int i = 0; i < n; i++) // string in gluing_matrix
+    {
+        cmplx_dG_score_string_writer (sep,
+                                      write,
+                                      &((*gluing_matrix)[i]));
+
+        appeared_pttrns_string_writer (sep,
+                                       &( ((*pttrn_base)[i]).pttrn ),
+                                       write,
+                                       &((*gluing_matrix)[i]),
+                                       pttrn_base                   );
+
+        gluing_dG_score_string_writer (sep,
+                                       write,
+                                       &((*gluing_matrix)[i]));
     }
 }
 
@@ -381,7 +528,21 @@ int main()
                          &gluing_matrix,
                          dna_flag,
                          max_pttrn_cmplx_dG);
-    s
+
+    if ( gluing_dG_score_calc (&gluing_matrix) )
+    {
+        cout << endl << "Fail in function gluing_dG_score_calc" << endl;
+        return 1;
+    }
+
+    ofstream write;
+
+    write.open(AAGS_result_file);
+
+    gluing_matrix_writer( &write,
+                          &gluing_matrix,
+                          &pttrn_base     );
+    write.close();
 /*
     ofstream write;
 
