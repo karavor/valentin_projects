@@ -139,13 +139,14 @@ struct A_n_k_elmnt_with_nmb
     vector<unsigned short int> elmnt;
 };
 
-bool A_n_k_elmnt_reqrmnt ( A_n_k_elmnt_with_nmb* A_n_k_elmnt,
-                           vector< vector<unsigned short int> >* forbidden_A_n_k_elmnts_nmbs_stat)
+bool A_n_k_elmnt_test ( A_n_k_elmnt_with_nmb* A_n_k_elmnt,
+                        vector< vector<unsigned short int> >* forbidden_A_n_k_elmnts_nmbs_stat)
 {
     if ( (*A_n_k_elmnt).elmnt[ (*A_n_k_elmnt).elmnt.size() ] == 2) //for example
     {
         (*forbidden_A_n_k_elmnts_nmbs_stat)
-        [(*forbidden_A_n_k_elmnts_nmbs_stat).size() - 1].push_back( (*A_n_k_elmnt).nmb );
+        [(*forbidden_A_n_k_elmnts_nmbs_stat).size() - 1].
+        push_back( (*A_n_k_elmnt).nmb );
 
         return 0;
     }
@@ -153,32 +154,24 @@ bool A_n_k_elmnt_reqrmnt ( A_n_k_elmnt_with_nmb* A_n_k_elmnt,
     return 1;
 }
 
-template<class _DT_>
-
-void repeat_elmnts_in_vect_deleter (vector<_DT_>* vect)
+bool forbidden_A_n_k_elmnt_nmb_test( unsigned short int n,
+                                     unsigned short int current_A_n_k_elmnt_nmb,
+                                     vector< vector<unsigned short int> >* forbidden_A_n_k_elmnts_nmbs_stat )
 {
-    for (int i = 0; i < (*vect).size() - 1; i++)
-    {
-        for (int j = i + 1; j < (*vect).size(); j++)
-        {
-            if ( (*vect)[j] == (*vect)[i] )
-                (*vect).erase( (*vect).begin() + j );
-        }
-    }
-}
-/*
-bool current_itertn_forbddn_nmbs_maker (vector< vector<unsigned short int> >*
-                                        forbidden_A_n_k_elmnts_nmbs_stat     )
-{
-    for (int i = 0; i < (*forbidden_A_n_k_elmnts_nmbs_stat).size() - 1; i++)
+    for (int i = 0; i < (*forbidden_A_n_k_elmnts_nmbs_stat).size(); i++)
     {
         for (int j = 0; j < (*forbidden_A_n_k_elmnts_nmbs_stat)[i].size(); j++)
         {
-            s
+            if ( ( current_A_n_k_elmnt_nmb -
+                   (*forbidden_A_n_k_elmnts_nmbs_stat)[i][j] ) % int_pow(n, i + 1) == 0 )
+            {
+                return 0;
+            }
         }
     }
+    return 1;
 }
-*/
+
 bool A_n_k_maker ( unsigned short int n,
                    unsigned short int k,
                    vector< A_n_k_elmnt_with_nmb >* A_n_k )
@@ -197,8 +190,8 @@ bool A_n_k_maker ( unsigned short int n,
         current_A_n_k_elmnt.elmnt.push_back(i);
         current_A_n_k_elmnt.nmb = i;
 
-        if ( A_n_k_elmnt_reqrmnt( &current_A_n_k_elmnt,
-                                  &forbidden_A_n_k_elmnts_nmbs_stat ) )
+        if ( A_n_k_elmnt_test( &current_A_n_k_elmnt,
+                               &forbidden_A_n_k_elmnts_nmbs_stat ) )
         {
             (*A_n_k).push_back(current_A_n_k_elmnt);
         }
@@ -207,32 +200,65 @@ bool A_n_k_maker ( unsigned short int n,
     }
 
     int fix_arr_size;
+    int insert_nmb;
+    unsigned short int last_erased_elmnt_nmb;
 
     for (int itertn_nmb = 1; itertn_nmb < k; itertn_nmb++)
     {
+        insert_nmb = 0;
         current_A_n_k_elmnt.nmb = 0;
+        last_erased_elmnt_nmb = 0;
 
         fix_arr_size = (*A_n_k).size();
 
         forbidden_A_n_k_elmnts_nmbs_stat.push_back(init_vect);
-        //current_itertn_forbddn_nmbs_maker ( &forbidden_A_n_k_elmnts_nmbs_stat );
 
         for (int i = 0; i < fix_arr_size; i++)
         {
-            current_A_n_k_elmnt.elmnt = ((*A_n_k)[current_A_n_k_elmnt.nmb]).elmnt;
+            current_A_n_k_elmnt.elmnt = ((*A_n_k)[insert_nmb]).elmnt;
 
-            (*A_n_k).erase( (*A_n_k).begin() + current_A_n_k_elmnt.nmb );
+            current_A_n_k_elmnt.nmb = n * ((*A_n_k)[insert_nmb]).nmb;
+
+            if ( ((*A_n_k)[insert_nmb]).nmb - 1 > last_erased_elmnt_nmb )
+            {
+                for (int j = (last_erased_elmnt_nmb + 1) * n;
+                         j < ((*A_n_k)[insert_nmb]).nmb  * n; j++)
+                {
+                    forbidden_A_n_k_elmnts_nmbs_stat
+                    [forbidden_A_n_k_elmnts_nmbs_stat.size() - 1].
+                    push_back( j );
+                }
+            }
+
+            (*A_n_k).erase( (*A_n_k).begin() + insert_nmb );
+
+            last_erased_elmnt_nmb = ((*A_n_k)[insert_nmb]).nmb;
 
             for (int j = 0; j < n; j++)
             {
-                current_A_n_k_elmnt.elmnt.push_back(j);
+                if ( forbidden_A_n_k_elmnt_nmb_test( n,
+                                                     current_A_n_k_elmnt.nmb,
+                                                     &forbidden_A_n_k_elmnts_nmbs_stat ) )
+                {
+                    if ( A_n_k_elmnt_test( &current_A_n_k_elmnt,
+                                           &forbidden_A_n_k_elmnts_nmbs_stat ) )
+                    {
+                        current_A_n_k_elmnt.elmnt.push_back(j);
 
-                (*A_n_k).insert( (*A_n_k).begin() + current_A_n_k_elmnt.nmb + j,
+                        (*A_n_k).insert( (*A_n_k).begin() + insert_nmb,
                                   current_A_n_k_elmnt);
+                        insert_nmb ++;
 
-                current_A_n_k_elmnt.elmnt.erase( current_A_n_k_elmnt.elmnt.end() - 1 );
+                        current_A_n_k_elmnt.elmnt.
+                        erase( current_A_n_k_elmnt.elmnt.end() - 1 );
+                    }
+                    else forbidden_A_n_k_elmnts_nmbs_stat
+                         [forbidden_A_n_k_elmnts_nmbs_stat.size() - 1].
+                         push_back( current_A_n_k_elmnt.nmb );
+                }
+
+                current_A_n_k_elmnt.nmb ++;
             }
-            current_A_n_k_elmnt.nmb += n;
         }
     }
     return 0;
@@ -243,20 +269,6 @@ int main()
     //MFE_FUNC_RNA MFE_FUNC_DNA
     //CONCENTRATIONS_FUNC_RNA CONCENTRATIONS_FUNC_DNA
     //system (MFE_FUNC_DNA);
-    vector<int> int_vect;
-    int_vect.push_back(1);
-    int_vect.push_back(2);
-    int_vect.push_back(3);
-    int_vect.push_back(3);
-    int_vect.push_back(2);
-    int_vect.push_back(1);
-
-    repeat_elmnts_in_vect_deleter<int> (&int_vect);
-
-    for (int i = 0; i < int_vect.size(); i++)
-    {
-        cout << int_vect[i] << endl;
-    }
 
     return 0;
 }
